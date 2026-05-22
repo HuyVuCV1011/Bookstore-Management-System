@@ -1,0 +1,18 @@
+package com.bookstore.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class SessionStatsDTO {
+
+    private Long totalSessions;
+    private Long activeSessions;
+    private Long revokedSessions;
+    private Long expiredSessions;
+}
