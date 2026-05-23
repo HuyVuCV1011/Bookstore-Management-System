@@ -4,6 +4,7 @@ import com.bookstore.dto.request.CartItemRequest;
 import com.bookstore.entity.Book;
 import com.bookstore.entity.BusinessStatus;
 import com.bookstore.entity.mongodb.Cart;
+import com.bookstore.exception.InsufficientStockException;
 import com.bookstore.exception.ResourceNotFoundException;
 import com.bookstore.repository.BookRepository;
 import com.bookstore.repository.mongodb.CartRepository;
@@ -107,7 +108,7 @@ public class CartService {
         }
 
         if (book.getStockQuantity() < quantity) {
-            throw new IllegalStateException("Insufficient stock. Available: " + book.getStockQuantity());
+            throw new InsufficientStockException("Insufficient stock. Available: " + book.getStockQuantity());
         }
 
         return book;

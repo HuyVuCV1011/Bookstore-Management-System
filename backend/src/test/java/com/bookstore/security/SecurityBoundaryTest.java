@@ -6,9 +6,8 @@ import com.bookstore.controller.OrderController;
 import com.bookstore.dto.request.BookRequest;
 import com.bookstore.entity.BusinessStatus;
 import com.bookstore.repository.cassandra.SessionRepository;
-import com.bookstore.service.BookSearchService;
+import com.bookstore.service.CatalogQueryService;
 import com.bookstore.service.BookService;
-import com.bookstore.service.InteractionEventService;
 import com.bookstore.service.JwtService;
 import com.bookstore.service.OrderHistoryService;
 import com.bookstore.service.OrderService;
@@ -48,13 +47,7 @@ class SecurityBoundaryTest {
     private BookService bookService;
 
     @MockBean
-    private BookSearchService bookSearchService;
-
-    @MockBean
-    private com.bookstore.mapper.BookDetailMapper bookDetailMapper;
-
-    @MockBean
-    private InteractionEventService interactionEventService;
+    private CatalogQueryService catalogQueryService;
 
     @MockBean
     private OrderService orderService;
@@ -76,7 +69,7 @@ class SecurityBoundaryTest {
 
     @Test
     void publicCatalogGet_Anonymous_IsAllowed() throws Exception {
-        Mockito.when(bookSearchService.getAllBooks(any())).thenReturn(Page.empty());
+        Mockito.when(catalogQueryService.getAllBooks(any(), any(), any(), any())).thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/books"))
                 .andExpect(status().isOk());

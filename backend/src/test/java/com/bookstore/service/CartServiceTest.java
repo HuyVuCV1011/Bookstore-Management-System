@@ -6,6 +6,7 @@ import com.bookstore.entity.BusinessStatus;
 import com.bookstore.entity.mongodb.Cart;
 import com.bookstore.repository.BookRepository;
 import com.bookstore.repository.mongodb.CartRepository;
+import com.bookstore.exception.InsufficientStockException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -70,7 +71,7 @@ class CartServiceTest {
         CartItemRequest request = new CartItemRequest(bookId, 15);
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
 
-        assertThrows(IllegalStateException.class, () -> cartService.addToCart(userId, request));
+        assertThrows(InsufficientStockException.class, () -> cartService.addToCart(userId, request));
     }
 
     @Test
@@ -85,7 +86,7 @@ class CartServiceTest {
         when(cartRepository.findById(userId)).thenReturn(Optional.of(cart));
         when(bookRepository.findById(bookId)).thenReturn(Optional.of(book));
 
-        assertThrows(IllegalStateException.class, () -> cartService.addToCart(userId, request));
+        assertThrows(InsufficientStockException.class, () -> cartService.addToCart(userId, request));
         verify(cartRepository, never()).save(any());
     }
 

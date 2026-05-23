@@ -32,7 +32,7 @@ public class BookRequest {
     private Integer publicationYear;
 
     @NotNull(message = "Price is required")
-    @DecimalMin(value = "0.00", message = "Price must be non-negative")
+    @DecimalMin(value = "0.00", inclusive = false, message = "Price must be greater than zero")
     private BigDecimal price;
 
     @NotNull(message = "Stock quantity is required")

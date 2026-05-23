@@ -3,19 +3,12 @@ package com.bookstore.controller;
 import com.bookstore.dto.request.BookRequest;
 import com.bookstore.dto.response.BookResponse;
 import com.bookstore.dto.response.PageResponse;
-import com.bookstore.entity.mongodb.BookDetail;
-import com.bookstore.mapper.BookDetailMapper;
 import com.bookstore.security.CustomUserDetails;
-import com.bookstore.service.BookSearchService;
 import com.bookstore.service.BookService;
-import com.bookstore.service.InteractionEventService;
+import com.bookstore.service.CatalogQueryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,7 +16,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -32,12 +24,7 @@ import java.util.UUID;
 public class BookController {
 
     private final BookService bookService;
-    private final BookSearchService bookSearchService;
-    private final BookDetailMapper bookDetailMapper;
-    private final InteractionEventService interactionEventService;
-
-    @Value("${bookstore.cdc.use-mongo-for-reads:true}")
-    private boolean useMongoForReads;
+    private final CatalogQueryService catalogQueryService;
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('STAFF')")
@@ -48,25 +35,8 @@ public class BookController {
 
     @GetMapping("/{id}")
     public ResponseEntity<BookResponse> getById(@PathVariable Integer id) {
-        // Track view event
-        try {
-            UUID userId = getCurrentUserId();
-            if (userId != null) {
-                interactionEventService.trackView(userId, id);
-            }
-        } catch (Exception e) {
-            // Don't fail the request if tracking fails
-        }
-
-        if (useMongoForReads) {
-            Optional<BookDetail> bookDetail = bookSearchService.getBookDetailById(id);
-            if (bookDetail.isPresent()) {
-                BookResponse response = bookDetailMapper.toBookResponse(bookDetail.get());
-                return ResponseEntity.ok(response);
-            }
-        }
-        // Fallback to PostgreSQL
-        BookResponse response = bookService.getById(id);
+        UUID userId = getCurrentUserId();
+        BookResponse response = catalogQueryService.getBookById(id, userId);
         return ResponseEntity.ok(response);
     }
 
@@ -82,45 +52,8 @@ public class BookController {
             @RequestParam(required = false, defaultValue = "10") Integer size,
             @RequestParam(required = false) String keyword
     ) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-        Page<BookResponse> result;
-
-        if (useMongoForReads) {
-            Page<BookDetail> bookDetails = (keyword != null && !keyword.isBlank()) ?
-                    bookSearchService.searchBooks(keyword, pageable) :
-                    bookSearchService.getAllBooks(pageable);
-
-            result = bookDetails.map(bookDetailMapper::toBookResponse);
-
-            // Track search event if keyword is provided
-            if (keyword != null && !keyword.isBlank()) {
-                try {
-                    UUID userId = getCurrentUserId();
-                    if (userId != null) {
-                        interactionEventService.trackSearch(userId, keyword, (int) bookDetails.getTotalElements());
-                    }
-                } catch (Exception e) {
-                    // Don't fail the request if tracking fails
-                }
-            }
-        } else {
-            // Fallback to PostgreSQL
-            Page<BookResponse> pgResult = bookService.getAll(pageable, keyword);
-            result = pgResult;
-
-            // Track search event if keyword is provided
-            if (keyword != null && !keyword.isBlank()) {
-                try {
-                    UUID userId = getCurrentUserId();
-                    if (userId != null) {
-                        interactionEventService.trackSearch(userId, keyword, (int) pgResult.getTotalElements());
-                    }
-                } catch (Exception e) {
-                    // Don't fail the request if tracking fails
-                }
-            }
-        }
-
+        UUID userId = getCurrentUserId();
+        Page<BookResponse> result = catalogQueryService.getAllBooks(page, size, keyword, userId);
         return ResponseEntity.ok(PageResponse.of(result));
     }
 

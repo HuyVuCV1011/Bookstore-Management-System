@@ -36,7 +36,7 @@ public class InteractionEventService {
     @Async
     public void trackEvent(UUID userId, Integer bookId, String eventType, String metadata) {
         try {
-            log.info("=== TRACKING EVENT START === type: {}, userId: {}, bookId: {}", eventType, userId, bookId);
+            log.debug("=== TRACKING EVENT START === type: {}, userId: {}, bookId: {}", eventType, userId, bookId);
 
             UUID id = UUID.randomUUID();
             Instant eventTime = Instant.now();
@@ -92,7 +92,7 @@ public class InteractionEventService {
             // 5. Maintain Redis aggregates for high-speed admin stats
             maintainRedisMetrics(userId, bookId, eventType);
 
-            log.info("=== TRACKING EVENT SUCCESS === Tracked {} event - userId: {}, bookId: {}", eventType, userId, bookId);
+            log.debug("=== TRACKING EVENT SUCCESS === Tracked {} event - userId: {}, bookId: {}", eventType, userId, bookId);
         } catch (Exception e) {
             log.error("=== TRACKING EVENT FAILED === type: {}, userId: {}, bookId: {}",
                     eventType, userId, bookId, e);

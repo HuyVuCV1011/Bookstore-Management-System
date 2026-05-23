@@ -1,6 +1,6 @@
 package com.bookstore.exception;
 
-public class PurchaseOrderNotFoundException extends RuntimeException {
+public class PurchaseOrderNotFoundException extends ResourceNotFoundException {
     public PurchaseOrderNotFoundException(Integer id) {
         super("Purchase order not found with id: " + id);
     }

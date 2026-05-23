@@ -45,16 +45,16 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<MessageResponse> register(@Valid @RequestBody RegisterRequest request) {
-        log.info("Registration attempt for email: {}", request.getEmail());
+        log.info("Registration attempt for email: {}", maskEmail(request.getEmail()));
         try {
             UserResponse userResponse = authService.register(request);
-            log.info("Registration successful for email: {}, userId: {}", request.getEmail(), userResponse.getId());
+            log.info("Registration successful for email: {}, userId: {}", maskEmail(request.getEmail()), userResponse.getId());
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(MessageResponse.builder()
                             .message("Registration successful")
                             .build());
         } catch (Exception e) {
-            log.error("Registration failed for email: {}, error: {}", request.getEmail(), e.getMessage(), e);
+            log.error("Registration failed for email: {}, error: {}", maskEmail(request.getEmail()), e.getMessage(), e);
             throw e;
         }
     }
@@ -66,13 +66,13 @@ public class AuthController {
             HttpServletResponse httpResponse
     ) {
         String ipAddress = rateLimitService.resolveClientIP(httpRequest);
-        log.info("Login attempt for email: {} from IP: {}", request.getEmail(), ipAddress);
+        log.info("Login attempt for email: {} from IP: {}", maskEmail(request.getEmail()), maskIP(ipAddress));
 
         rateLimitService.checkRateLimit(ipAddress);
 
         try {
             LoginResponse response = authService.login(request);
-            log.info("Login successful for email: {}, userId: {}", request.getEmail(), response.getUser().getId());
+            log.info("Login successful for email: {}, userId: {}", maskEmail(request.getEmail()), response.getUser().getId());
 
             // Set refresh token cookie
             long maxAge = request.isRememberMe() ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60;
@@ -108,7 +108,7 @@ public class AuthController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("Login failed for email: {} from IP: {}, error: {}", request.getEmail(), ipAddress, e.getMessage());
+            log.error("Login failed for email: {} from IP: {}, error: {}", maskEmail(request.getEmail()), maskIP(ipAddress), e.getMessage());
             rateLimitService.recordFailedAttempt(ipAddress);
             throw e;
         }
@@ -168,4 +168,36 @@ public class AuthController {
         }
     }
 
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return "invalid-email";
+        }
+        int atIdx = email.indexOf("@");
+        String localPart = email.substring(0, atIdx);
+        String domain = email.substring(atIdx + 1);
+        if (localPart.length() <= 2) {
+            return localPart + "***@" + domain;
+        }
+        return localPart.charAt(0) + "***" + localPart.charAt(localPart.length() - 1) + "@" + domain;
+    }
+
+    private String maskIP(String ip) {
+        if (ip == null) {
+            return "unknown-ip";
+        }
+        if (ip.contains(".")) {
+            // IPv4
+            String[] parts = ip.split("\\.");
+            if (parts.length >= 2) {
+                return parts[0] + "." + parts[1] + ".x.x";
+            }
+        } else if (ip.contains(":")) {
+            // IPv6
+            String[] parts = ip.split(":");
+            if (parts.length >= 2) {
+                return parts[0] + ":" + parts[1] + ":x:x::x";
+            }
+        }
+        return "masked-ip";
+    }
 }
