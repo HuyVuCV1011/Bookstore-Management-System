@@ -47,7 +47,7 @@ const PaymentMethodSelect: React.FC<PaymentMethodSelectProps> = ({
                 <div className="font-semibold text-text-primary-light dark:text-text-primary-dark">
                   {method.label}
                 </div>
-                <div className="text-xs text-text-secondary mt-1">
+                <div className="text-xs text-text-secondary dark:text-text-primary-dark/60 mt-1">
                   {method.description}
                 </div>
               </div>

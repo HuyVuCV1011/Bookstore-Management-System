@@ -34,7 +34,7 @@ const OrderHistoryPage: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-br from-bg-light via-gray-50 to-blue-50 dark:from-bg-dark dark:via-gray-900 dark:to-blue-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto"></div>
-          <p className="mt-4 text-text-secondary">Đang tải đơn hàng...</p>
+          <p className="mt-4 text-text-secondary dark:text-text-primary-dark/60">Đang tải đơn hàng...</p>
         </div>
       </div>
     );
@@ -77,7 +77,7 @@ const OrderHistoryPage: React.FC = () => {
               <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark mb-2">
                 Chưa có đơn hàng nào
               </h2>
-              <p className="text-text-secondary mb-6">
+              <p className="text-text-secondary dark:text-text-primary-dark/60 mb-6">
                 Bạn chưa đặt đơn hàng nào. Bắt đầu mua sắm để xem lịch sử đơn hàng tại đây.
               </p>
               <button
@@ -106,7 +106,7 @@ const OrderHistoryPage: React.FC = () => {
                         </h3>
                         <OrderStatusBadge status={order.status || order.orderStatus} type="order" />
                       </div>
-                      <p className="text-sm text-text-secondary">
+                      <p className="text-sm text-text-secondary dark:text-text-primary-dark/60">
                         📅 {new Date(order.orderedAt || order.createdAt || '').toLocaleDateString('vi-VN', {
                           year: 'numeric',
                           month: 'long',
@@ -115,7 +115,7 @@ const OrderHistoryPage: React.FC = () => {
                           minute: '2-digit'
                         })}
                       </p>
-                      <p className="text-sm text-text-secondary mt-1">
+                      <p className="text-sm text-text-secondary dark:text-text-primary-dark/60 mt-1">
                         📍 {order.shippingAddress}
                       </p>
                     </div>
@@ -123,8 +123,8 @@ const OrderHistoryPage: React.FC = () => {
                     {/* Total Amount */}
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-sm text-text-secondary">Tổng tiền</p>
-                        <p className="text-2xl font-bold text-primary">
+                        <p className="text-sm text-text-secondary dark:text-text-primary-dark/60">Tổng tiền</p>
+                        <p className="text-2xl font-bold text-primary dark:text-[#d4e9e2]">
                           {order.totalAmount.toLocaleString('vi-VN')} đ
                         </p>
                       </div>
@@ -144,7 +144,7 @@ const OrderHistoryPage: React.FC = () => {
                 {/* Order Items Preview */}
                 {order.itemCount && (
                   <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-3 border-t dark:border-gray-700">
-                    <p className="text-sm text-text-secondary">
+                    <p className="text-sm text-text-secondary dark:text-text-primary-dark/60">
                       📚 {order.itemCount} sản phẩm trong đơn hàng này
                     </p>
                   </div>

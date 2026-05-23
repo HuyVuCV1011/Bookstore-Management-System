@@ -1,6 +1,7 @@
 package com.bookstore.entity;
 
 import lombok.*;
+import org.springframework.data.cassandra.core.mapping.Indexed;
 import org.springframework.data.cassandra.core.mapping.PrimaryKey;
 import org.springframework.data.cassandra.core.mapping.Table;
 
@@ -18,6 +19,7 @@ public class SessionEntity {
     @PrimaryKey
     private UUID sessionId;
 
+    @Indexed
     private UUID userId;
 
     private String refreshToken;

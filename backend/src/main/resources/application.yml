@@ -51,6 +51,14 @@ security:
   rate-limit:
     login-attempts: 5
     login-window: 60000  # 1 minute
+    trust-proxy: false
+  cookie:
+    name: refreshToken
+    path: /api/auth
+    secure: true
+    same-site: Lax
+  session:
+    fail-closed: true
 
 server:
   port: 8080

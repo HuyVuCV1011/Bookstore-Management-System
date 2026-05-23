@@ -46,7 +46,7 @@ export const BooksPage: React.FC = () => {
         const bookIds = booksData.map(b => b.id).filter(Boolean) as number[];
         if (bookIds.length > 0) {
           try {
-            const response = await fetch('http://localhost:8080/api/reviews/summaries', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080/api'}/reviews/summaries`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(bookIds),

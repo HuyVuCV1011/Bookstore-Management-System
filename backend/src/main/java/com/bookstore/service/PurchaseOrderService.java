@@ -33,7 +33,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderItemRepository purchaseOrderItemRepository;
     private final SupplierRepository supplierRepository;
     private final BookRepository bookRepository;
-    private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final InventoryService inventoryService;
     private final PurchaseOrderMapper purchaseOrderMapper;
 
     private UUID getCurrentUserId() {
@@ -50,7 +50,7 @@ public class PurchaseOrderService {
         int year = Year.now().getValue();
         String prefix = "PO-" + year + "-";
 
-        long count = purchaseOrderRepository.count() + 1;
+        Long count = purchaseOrderRepository.getNextSequenceValue();
         return prefix + String.format("%04d", count);
     }
 
@@ -221,7 +221,7 @@ public class PurchaseOrderService {
     public PurchaseOrderResponse receiveGoods(Integer id, ReceiveGoodsRequest request) {
         log.info("Receiving goods for purchase order ID: {}", id);
 
-        PurchaseOrder purchaseOrder = purchaseOrderRepository.findById(id)
+        PurchaseOrder purchaseOrder = purchaseOrderRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new PurchaseOrderNotFoundException(id));
 
         if (purchaseOrder.getStatus() != PurchaseOrderStatus.SUBMITTED &&
@@ -245,7 +245,7 @@ public class PurchaseOrderService {
             int newQuantityReceived = item.getQuantityReceived() + itemRequest.getQuantityReceived();
 
             if (newQuantityReceived > item.getQuantityOrdered()) {
-                throw new IllegalArgumentException(
+                throw new BusinessRuleException(
                     String.format("Received quantity (%d) exceeds ordered quantity (%d) for item %d",
                         newQuantityReceived, item.getQuantityOrdered(), item.getId())
                 );
@@ -317,30 +317,17 @@ public class PurchaseOrderService {
     }
 
     private void createInventoryTransaction(
-            Book book,
+            Book bookParam,
             Integer quantity,
             Integer purchaseOrderId,
             String notes) {
 
-        Integer oldQuantity = book.getStockQuantity();
-        Integer newQuantity = oldQuantity + quantity;
-
-        InventoryTransaction transaction = InventoryTransaction.builder()
-                .book(book)
-                .transactionType(TransactionType.PURCHASE_IN)
-                .quantityChange(quantity)
-                .referenceType(ReferenceType.PURCHASE_ORDER)
-                .referenceId(purchaseOrderId)
-                .oldQuantity(oldQuantity)
-                .newQuantity(newQuantity)
-                .performedBy(getCurrentUserId())
-                .notes(notes)
-                .transactionDate(LocalDateTime.now())
-                .build();
-
-        inventoryTransactionRepository.save(transaction);
-
-        book.setStockQuantity(newQuantity);
-        bookRepository.save(book);
+        inventoryService.recordPurchaseTransaction(
+                bookParam.getId(),
+                quantity,
+                purchaseOrderId,
+                getCurrentUserId(),
+                notes
+        );
     }
 }

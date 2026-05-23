@@ -3,6 +3,7 @@ package com.bookstore.service;
 import com.bookstore.dto.request.ReviewRequest;
 import com.bookstore.dto.request.ReviewUpdateRequest;
 import com.bookstore.dto.response.RatingSummaryResponse;
+import com.bookstore.dto.response.RatingAggregationResult;
 import com.bookstore.entity.Book;
 import com.bookstore.entity.mongodb.Review;
 import com.bookstore.exception.ResourceNotFoundException;
@@ -18,9 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -105,8 +104,8 @@ public class ReviewService {
     }
 
     public RatingSummaryResponse getRatingSummary(Integer bookId) {
-        List<Review> reviews = reviewRepository.findByBookIdAndModeratedTrue(bookId);
-        if (reviews.isEmpty()) {
+        List<RatingAggregationResult> results = reviewRepository.aggregateRatings(List.of(bookId));
+        if (results.isEmpty()) {
             return RatingSummaryResponse.builder()
                     .averageRating(0.0)
                     .totalReviews(0L)
@@ -114,13 +113,23 @@ public class ReviewService {
                     .build();
         }
 
-        double avg = reviews.stream().mapToInt(Review::getRating).average().orElse(0.0);
-        Map<Integer, Long> dist = reviews.stream()
-                .collect(Collectors.groupingBy(Review::getRating, Collectors.counting()));
+        long totalReviews = 0;
+        double sumRatings = 0.0;
+        Map<Integer, Long> dist = new HashMap<>();
+
+        for (RatingAggregationResult r : results) {
+            int rating = r.getRating();
+            long count = r.getCount();
+            dist.put(rating, count);
+            totalReviews += count;
+            sumRatings += rating * count;
+        }
+
+        double avg = totalReviews > 0 ? sumRatings / totalReviews : 0.0;
 
         return RatingSummaryResponse.builder()
                 .averageRating(avg)
-                .totalReviews((long) reviews.size())
+                .totalReviews(totalReviews)
                 .ratingDistribution(dist)
                 .build();
     }
@@ -149,10 +158,47 @@ public class ReviewService {
     }
 
     public Map<Integer, RatingSummaryResponse> getBulkRatingSummaries(List<Integer> bookIds) {
-        Map<Integer, RatingSummaryResponse> result = new java.util.HashMap<>();
-        for (Integer bookId : bookIds) {
-            result.put(bookId, getRatingSummary(bookId));
+        if (bookIds == null || bookIds.isEmpty()) {
+            return Collections.emptyMap();
         }
+
+        List<RatingAggregationResult> allResults = reviewRepository.aggregateRatings(bookIds);
+        Map<Integer, List<RatingAggregationResult>> groupedResults = allResults.stream()
+                .collect(Collectors.groupingBy(RatingAggregationResult::getBookId));
+
+        Map<Integer, RatingSummaryResponse> result = new HashMap<>();
+        for (Integer bookId : bookIds) {
+            List<RatingAggregationResult> bookRatings = groupedResults.getOrDefault(bookId, Collections.emptyList());
+            if (bookRatings.isEmpty()) {
+                result.put(bookId, RatingSummaryResponse.builder()
+                        .averageRating(0.0)
+                        .totalReviews(0L)
+                        .ratingDistribution(Collections.emptyMap())
+                        .build());
+                continue;
+            }
+
+            long totalReviews = 0;
+            double sumRatings = 0.0;
+            Map<Integer, Long> dist = new HashMap<>();
+
+            for (RatingAggregationResult r : bookRatings) {
+                int rating = r.getRating();
+                long count = r.getCount();
+                dist.put(rating, count);
+                totalReviews += count;
+                sumRatings += rating * count;
+            }
+
+            double avg = totalReviews > 0 ? sumRatings / totalReviews : 0.0;
+
+            result.put(bookId, RatingSummaryResponse.builder()
+                    .averageRating(avg)
+                    .totalReviews(totalReviews)
+                    .ratingDistribution(dist)
+                    .build());
+        }
+
         return result;
     }
 }

@@ -8,10 +8,7 @@ import com.bookstore.event.PublisherChangedEvent;
 import com.bookstore.service.BookDetailSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
 @RequiredArgsConstructor
@@ -20,8 +17,6 @@ public class BookDetailEventHandler {
 
     private final BookDetailSyncService syncService;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Async("cdcExecutor")
     public void handleBookChanged(BookChangedEvent event) {
         log.debug("[CDC] Received BookChangedEvent: id={}, type={}",
                   event.getEntityId(), event.getChangeType());
@@ -33,8 +28,6 @@ public class BookDetailEventHandler {
         }
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Async("cdcExecutor")
     public void handleAuthorChanged(AuthorChangedEvent event) {
         log.debug("[CDC] Received AuthorChangedEvent: id={}, type={}",
                   event.getEntityId(), event.getChangeType());
@@ -47,8 +40,6 @@ public class BookDetailEventHandler {
         }
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Async("cdcExecutor")
     public void handleCategoryChanged(CategoryChangedEvent event) {
         log.debug("[CDC] Received CategoryChangedEvent: id={}, type={}",
                   event.getEntityId(), event.getChangeType());
@@ -61,8 +52,6 @@ public class BookDetailEventHandler {
         }
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Async("cdcExecutor")
     public void handlePublisherChanged(PublisherChangedEvent event) {
         log.debug("[CDC] Received PublisherChangedEvent: id={}, type={}",
                   event.getEntityId(), event.getChangeType());
@@ -75,8 +64,6 @@ public class BookDetailEventHandler {
         }
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Async("cdcExecutor")
     public void handleInventoryChanged(InventoryChangedEvent event) {
         log.debug("[CDC] Received InventoryChangedEvent: bookId={}, newQuantity={}",
                   event.getBookId(), event.getNewQuantity());

@@ -4,26 +4,28 @@ import com.bookstore.dto.response.InteractionEventDTO;
 import com.bookstore.dto.response.InteractionEventStatsDTO;
 import com.bookstore.dto.response.MessageResponse;
 import com.bookstore.dto.response.TopBookDTO;
-import com.bookstore.entity.InteractionEvent;
+import com.bookstore.entity.Book;
+import com.bookstore.entity.InteractionEventByBucket;
+import com.bookstore.entity.InteractionEventByType;
 import com.bookstore.entity.User;
 import com.bookstore.repository.BookRepository;
-import com.bookstore.repository.InteractionEventRepository;
 import com.bookstore.repository.UserRepository;
+import com.bookstore.repository.cassandra.InteractionEventByBucketRepository;
+import com.bookstore.repository.cassandra.InteractionEventByTypeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.cassandra.core.CassandraTemplate;
-import org.springframework.data.cassandra.core.query.Query;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,8 +36,9 @@ import java.util.stream.Collectors;
 @PreAuthorize("hasRole('ADMIN')")
 public class InteractionEventController {
 
-    private final InteractionEventRepository interactionEventRepository;
-    private final CassandraTemplate cassandraTemplate;
+    private final InteractionEventByTypeRepository typeRepository;
+    private final InteractionEventByBucketRepository bucketRepository;
+    private final StringRedisTemplate redisTemplate;
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
 
@@ -48,97 +51,97 @@ public class InteractionEventController {
             @RequestParam(required = false) String keyword
     ) {
         try {
-            log.info("Get interaction events - page: {}, size: {}, eventType: {}, flagged: {}, keyword: {}",
+            log.info("Get interaction events (optimized) - page: {}, size: {}, eventType: {}, flagged: {}, keyword: {}",
                     page, size, eventType, flagged, keyword);
 
-            // Get all events from Cassandra
-            List<InteractionEvent> allEvents = cassandraTemplate.select(Query.empty(), InteractionEvent.class);
-            log.debug("Found {} total events in Cassandra", allEvents.size());
-
-            // Convert to DTOs and apply filters
-            List<InteractionEventDTO> eventDTOs = allEvents.stream()
-                    .filter(event -> {
-                        // Filter by event type
-                        if (eventType != null && !eventType.isEmpty()) {
-                            return eventType.equalsIgnoreCase(event.getEventType());
-                        }
-                        return true;
-                    })
-                    .map(event -> {
-                        String userEmail = "Unknown";
-                        String bookTitle = "Unknown";
-
-                        try {
-                            User user = userRepository.findById(event.getUserId()).orElse(null);
-                            if (user != null) {
-                                userEmail = user.getEmail();
-                            }
-                        } catch (Exception e) {
-                            log.warn("Failed to fetch user for event {}", event.getId(), e);
-                        }
-
-                        try {
-                            if (event.getBookId() != null && event.getBookId() > 0) {
-                                bookRepository.findById(event.getBookId()).ifPresent(book -> {});
-                                bookTitle = "Book #" + event.getBookId();
-                            }
-                        } catch (Exception e) {
-                            log.warn("Failed to fetch book for event {}", event.getId(), e);
-                        }
-
-                        return InteractionEventDTO.builder()
-                                .id(event.getId())
-                                .userId(event.getUserId())
-                                .userEmail(userEmail)
-                                .bookId(event.getBookId())
-                                .bookTitle(bookTitle)
-                                .eventType(event.getEventType())
-                                .eventTime(LocalDateTime.ofInstant(event.getEventTime(), ZoneId.systemDefault()))
-                                .metadata(event.getMetadata())
-                                .flagged(false) // TODO: implement flagging mechanism
-                                .build();
-                    })
-                    .filter(dto -> {
-                        // Apply keyword filter
-                        if (keyword != null && !keyword.trim().isEmpty()) {
-                            String searchTerm = keyword.toLowerCase().trim();
-                            return dto.getUserEmail().toLowerCase().contains(searchTerm) ||
-                                   dto.getBookTitle().toLowerCase().contains(searchTerm) ||
-                                   dto.getEventType().toLowerCase().contains(searchTerm);
-                        }
-                        return true;
-                    })
-                    .sorted((a, b) -> b.getEventTime().compareTo(a.getEventTime())) // Sort by time DESC
-                    .collect(Collectors.toList());
-
-            log.debug("After filtering and sorting: {} events", eventDTOs.size());
-
-            // Pagination
-            int start = page * size;
-            int end = Math.min(start + size, eventDTOs.size());
-            List<InteractionEventDTO> pageContent = start < eventDTOs.size()
-                    ? eventDTOs.subList(start, end)
-                    : Collections.emptyList();
-
             Pageable pageable = PageRequest.of(page, size);
-            Page<InteractionEventDTO> eventsPage = new PageImpl<>(
-                    pageContent,
-                    pageable,
-                    eventDTOs.size()
-            );
+            List<InteractionEventDTO> eventDTOs = new ArrayList<>();
+            boolean hasNext = false;
+
+            if (eventType != null && !eventType.isBlank()) {
+                Slice<InteractionEventByType> slice = typeRepository.findByEventType(eventType, pageable);
+                hasNext = slice.hasNext();
+                List<InteractionEventByType> content = slice.getContent();
+
+                // Batch load users & books
+                Set<UUID> userIds = content.stream().map(InteractionEventByType::getUserId).filter(Objects::nonNull).collect(Collectors.toSet());
+                Set<Integer> bookIds = content.stream().map(InteractionEventByType::getBookId).filter(id -> id != null && id > 0).collect(Collectors.toSet());
+
+                Map<UUID, User> userMap = userRepository.findAllById(userIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+                Map<Integer, Book> bookMap = bookRepository.findAllById(bookIds).stream().collect(Collectors.toMap(Book::getId, b -> b));
+
+                for (InteractionEventByType event : content) {
+                    User user = userMap.get(event.getUserId());
+                    String userEmail = user != null ? user.getEmail() : "Unknown";
+
+                    Book book = bookMap.get(event.getBookId());
+                    String bookTitle = book != null ? book.getTitle() : ("Book #" + event.getBookId());
+
+                    eventDTOs.add(InteractionEventDTO.builder()
+                            .id(event.getId())
+                            .userId(event.getUserId())
+                            .userEmail(userEmail)
+                            .bookId(event.getBookId())
+                            .bookTitle(bookTitle)
+                            .eventType(event.getEventType())
+                            .eventTime(LocalDateTime.ofInstant(event.getEventTime(), ZoneId.systemDefault()))
+                            .metadata(event.getMetadata())
+                            .flagged(false)
+                            .build());
+                }
+            } else {
+                Slice<InteractionEventByBucket> slice = bucketRepository.findByBucket("all", pageable);
+                hasNext = slice.hasNext();
+                List<InteractionEventByBucket> content = slice.getContent();
+
+                // Batch load users & books
+                Set<UUID> userIds = content.stream().map(InteractionEventByBucket::getUserId).filter(Objects::nonNull).collect(Collectors.toSet());
+                Set<Integer> bookIds = content.stream().map(InteractionEventByBucket::getBookId).filter(id -> id != null && id > 0).collect(Collectors.toSet());
+
+                Map<UUID, User> userMap = userRepository.findAllById(userIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+                Map<Integer, Book> bookMap = bookRepository.findAllById(bookIds).stream().collect(Collectors.toMap(Book::getId, b -> b));
+
+                for (InteractionEventByBucket event : content) {
+                    User user = userMap.get(event.getUserId());
+                    String userEmail = user != null ? user.getEmail() : "Unknown";
+
+                    Book book = bookMap.get(event.getBookId());
+                    String bookTitle = book != null ? book.getTitle() : ("Book #" + event.getBookId());
+
+                    eventDTOs.add(InteractionEventDTO.builder()
+                            .id(event.getId())
+                            .userId(event.getUserId())
+                            .userEmail(userEmail)
+                            .bookId(event.getBookId())
+                            .bookTitle(bookTitle)
+                            .eventType(event.getEventType())
+                            .eventTime(LocalDateTime.ofInstant(event.getEventTime(), ZoneId.systemDefault()))
+                            .metadata(event.getMetadata())
+                            .flagged(false)
+                            .build());
+                }
+            }
+
+            // Apply keyword filter in memory if provided
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                String searchTerm = keyword.toLowerCase().trim();
+                eventDTOs = eventDTOs.stream()
+                        .filter(dto -> dto.getUserEmail().toLowerCase().contains(searchTerm) ||
+                                       dto.getBookTitle().toLowerCase().contains(searchTerm) ||
+                                       dto.getEventType().toLowerCase().contains(searchTerm))
+                        .collect(Collectors.toList());
+            }
 
             Map<String, Object> response = new HashMap<>();
-            response.put("events", eventsPage.getContent());
-            response.put("totalPages", eventsPage.getTotalPages());
-            response.put("totalElements", eventsPage.getTotalElements());
-            response.put("currentPage", eventsPage.getNumber());
+            response.put("events", eventDTOs);
+            response.put("totalPages", hasNext ? page + 2 : page + 1);
+            response.put("totalElements", (long) (page * size) + eventDTOs.size() + (hasNext ? size : 0));
+            response.put("currentPage", page);
 
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             log.error("Error fetching interaction events", e);
-            // Return empty response on error
-            Pageable pageable = PageRequest.of(page, size);
             Map<String, Object> response = new HashMap<>();
             response.put("events", Collections.emptyList());
             response.put("totalPages", 0);
@@ -151,27 +154,24 @@ public class InteractionEventController {
     @GetMapping("/stats")
     public ResponseEntity<InteractionEventStatsDTO> getStats() {
         try {
-            log.info("Get interaction event stats");
+            log.info("Get interaction event stats (from Redis)");
 
-            List<InteractionEvent> allEvents = cassandraTemplate.select(Query.empty(), InteractionEvent.class);
-            LocalDateTime todayStart = LocalDateTime.now().truncatedTo(ChronoUnit.DAYS);
+            String totalStr = redisTemplate.opsForValue().get("stats:events:total");
+            long totalEvents = totalStr != null ? Long.parseLong(totalStr) : 0L;
 
-            long totalEvents = allEvents.size();
-            long eventsToday = allEvents.stream()
-                    .filter(e -> {
-                        LocalDateTime eventTime = LocalDateTime.ofInstant(e.getEventTime(), ZoneId.systemDefault());
-                        return eventTime.isAfter(todayStart);
-                    })
-                    .count();
-            long uniqueUsers = allEvents.stream()
-                    .map(InteractionEvent::getUserId)
-                    .distinct()
-                    .count();
+            String todayStr = LocalDate.now().toString();
+            String todayCountStr = redisTemplate.opsForValue().get("stats:events:today:" + todayStr);
+            long eventsToday = todayCountStr != null ? Long.parseLong(todayCountStr) : 0L;
+
+            Long uniqueUsers = redisTemplate.opsForSet().size("stats:events:unique_users");
+            if (uniqueUsers == null) {
+                uniqueUsers = 0L;
+            }
 
             InteractionEventStatsDTO stats = InteractionEventStatsDTO.builder()
                     .totalEvents(totalEvents)
                     .eventsToday(eventsToday)
-                    .flaggedEvents(0L) // TODO: implement flagging
+                    .flaggedEvents(0L)
                     .uniqueUsers(uniqueUsers)
                     .build();
 
@@ -192,15 +192,14 @@ public class InteractionEventController {
     @GetMapping("/distribution")
     public ResponseEntity<Map<String, Long>> getDistribution() {
         try {
-            log.info("Get interaction event distribution");
+            log.info("Get interaction event distribution (from Redis)");
 
-            List<InteractionEvent> allEvents = cassandraTemplate.select(Query.empty(), InteractionEvent.class);
+            Map<Object, Object> rawDist = redisTemplate.opsForHash().entries("stats:events:distribution");
+            Map<String, Long> distribution = new HashMap<>();
 
-            Map<String, Long> distribution = allEvents.stream()
-                    .collect(Collectors.groupingBy(
-                            InteractionEvent::getEventType,
-                            Collectors.counting()
-                    ));
+            for (Map.Entry<Object, Object> entry : rawDist.entrySet()) {
+                distribution.put(entry.getKey().toString(), Long.parseLong(entry.getValue().toString()));
+            }
 
             log.info("Event distribution: {}", distribution);
             return ResponseEntity.ok(distribution);
@@ -217,49 +216,47 @@ public class InteractionEventController {
             @RequestParam(required = false, defaultValue = "10") int limit
     ) {
         try {
-            log.info("Get top books - metric: {}, limit: {}", metric, limit);
+            log.info("Get top books (from Redis) - metric: {}, limit: {}", metric, limit);
 
-            List<InteractionEvent> allEvents = cassandraTemplate.select(Query.empty(), InteractionEvent.class);
-
-            // Determine event type based on metric
-            String eventTypeFilter = switch (metric.toLowerCase()) {
-                case "views" -> "VIEW";
-                case "clicks" -> "CLICK";
-                case "add_to_cart", "cart" -> "ADD_TO_CART";
-                case "purchases" -> "PURCHASE";
-                case "bookmark", "wishlist" -> "BOOKMARK";
-                default -> "VIEW";
+            String redisMetric = switch (metric.toLowerCase()) {
+                case "views" -> "views";
+                case "clicks" -> "clicks";
+                case "add_to_cart", "cart" -> "cart";
+                case "purchases" -> "purchases";
+                case "bookmark", "wishlist" -> "wishlist";
+                default -> "views";
             };
 
-            // Group by book and count events
-            Map<Integer, Long> bookCounts = allEvents.stream()
-                    .filter(e -> eventTypeFilter.equals(e.getEventType()))
-                    .filter(e -> e.getBookId() != null && e.getBookId() > 0)
-                    .collect(Collectors.groupingBy(
-                            InteractionEvent::getBookId,
-                            Collectors.counting()
-                    ));
+            Set<TypedTuple<String>> topBookTuples = redisTemplate.opsForZSet()
+                    .reverseRangeWithScores("stats:books:" + redisMetric, 0, limit - 1);
 
-            // Sort and limit
-            List<TopBookDTO> topBooks = bookCounts.entrySet().stream()
-                    .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed())
-                    .limit(limit)
-                    .map(entry -> {
-                        String bookTitle = "Book #" + entry.getKey();
-                        try {
-                            bookRepository.findById(entry.getKey()).ifPresent(book -> {});
-                            bookTitle = "Book #" + entry.getKey(); // Keep simple for now
-                        } catch (Exception e) {
-                            log.warn("Failed to fetch book {}", entry.getKey(), e);
-                        }
+            if (topBookTuples == null || topBookTuples.isEmpty()) {
+                return ResponseEntity.ok(Collections.emptyList());
+            }
 
-                        return TopBookDTO.builder()
-                                .bookId(entry.getKey())
-                                .bookTitle(bookTitle)
-                                .count(entry.getValue())
-                                .build();
-                    })
+            // Extract book IDs
+            List<Integer> bookIds = topBookTuples.stream()
+                    .map(t -> Integer.parseInt(t.getValue()))
                     .toList();
+
+            // Batch fetch book details to enrich titles
+            Map<Integer, Book> bookMap = bookRepository.findAllById(bookIds).stream()
+                    .collect(Collectors.toMap(Book::getId, b -> b));
+
+            List<TopBookDTO> topBooks = new ArrayList<>();
+            for (TypedTuple<String> tuple : topBookTuples) {
+                int bookId = Integer.parseInt(tuple.getValue());
+                double score = tuple.getScore() != null ? tuple.getScore() : 0.0;
+
+                Book book = bookMap.get(bookId);
+                String bookTitle = book != null ? book.getTitle() : ("Book #" + bookId);
+
+                topBooks.add(TopBookDTO.builder()
+                        .bookId(bookId)
+                        .bookTitle(bookTitle)
+                        .count((long) score)
+                        .build());
+            }
 
             log.info("Top {} books by {}: {} results", limit, metric, topBooks.size());
             return ResponseEntity.ok(topBooks);

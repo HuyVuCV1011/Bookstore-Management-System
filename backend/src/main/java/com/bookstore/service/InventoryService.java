@@ -83,7 +83,7 @@ public class InventoryService {
     }
 
     public InventoryTransactionResponse adjustStock(StockAdjustmentRequest request) {
-        Book book = bookRepository.findById(request.getBookId())
+        Book book = bookRepository.findByIdForUpdate(request.getBookId())
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + request.getBookId()));
 
         int oldQuantity = book.getStockQuantity();
@@ -114,7 +114,7 @@ public class InventoryService {
     }
 
     public void recordPurchaseTransaction(Integer bookId, Integer quantity, Integer purchaseOrderId, UUID performedBy, String notes) {
-        Book book = bookRepository.findById(bookId)
+        Book book = bookRepository.findByIdForUpdate(bookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + bookId));
 
         int oldQuantity = book.getStockQuantity();
@@ -128,7 +128,7 @@ public class InventoryService {
                 .transactionType(TransactionType.PURCHASE_IN)
                 .quantityChange(quantity)
                 .referenceType(ReferenceType.PURCHASE_ORDER)
-                .referenceId(purchaseOrderId)
+                .referenceId(String.valueOf(purchaseOrderId))
                 .oldQuantity(oldQuantity)
                 .newQuantity(newQuantity)
                 .performedBy(performedBy)
@@ -138,8 +138,8 @@ public class InventoryService {
         transactionRepository.save(transaction);
     }
 
-    public void recordSaleTransaction(Integer bookId, Integer quantity, Integer orderId, UUID performedBy) {
-        Book book = bookRepository.findById(bookId)
+    public void recordSaleTransaction(Integer bookId, Integer quantity, UUID orderId, UUID performedBy) {
+        Book book = bookRepository.findByIdForUpdate(bookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + bookId));
 
         int oldQuantity = book.getStockQuantity();
@@ -157,11 +157,36 @@ public class InventoryService {
                 .transactionType(TransactionType.SALE_OUT)
                 .quantityChange(-quantity)
                 .referenceType(ReferenceType.ORDER)
-                .referenceId(orderId)
+                .referenceId(orderId.toString())
                 .oldQuantity(oldQuantity)
                 .newQuantity(newQuantity)
                 .performedBy(performedBy)
                 .notes("Order #" + orderId)
+                .build();
+
+        transactionRepository.save(transaction);
+    }
+
+    public void recordCancelTransaction(Integer bookId, Integer quantity, UUID orderId, UUID performedBy) {
+        Book book = bookRepository.findByIdForUpdate(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + bookId));
+
+        int oldQuantity = book.getStockQuantity();
+        int newQuantity = oldQuantity + quantity;
+
+        book.setStockQuantity(newQuantity);
+        bookRepository.save(book);
+
+        InventoryTransaction transaction = InventoryTransaction.builder()
+                .book(book)
+                .transactionType(TransactionType.SALE_OUT)
+                .quantityChange(quantity)
+                .referenceType(ReferenceType.ORDER)
+                .referenceId(orderId.toString())
+                .oldQuantity(oldQuantity)
+                .newQuantity(newQuantity)
+                .performedBy(performedBy)
+                .notes("Cancelled Order #" + orderId)
                 .build();
 
         transactionRepository.save(transaction);

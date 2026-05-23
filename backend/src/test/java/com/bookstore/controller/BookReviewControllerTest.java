@@ -46,7 +46,7 @@ class BookReviewControllerTest {
     private CustomUserDetailsService customUserDetailsService;
 
     @MockBean
-    private com.bookstore.repository.SessionRepository sessionRepository;
+    private com.bookstore.repository.cassandra.SessionRepository sessionRepository;
 
     @Autowired
     private ObjectMapper objectMapper;

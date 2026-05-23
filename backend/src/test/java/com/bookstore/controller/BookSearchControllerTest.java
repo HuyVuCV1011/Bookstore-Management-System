@@ -43,7 +43,7 @@ class BookSearchControllerTest {
     private com.bookstore.security.CustomUserDetailsService customUserDetailsService;
 
     @MockBean
-    private com.bookstore.repository.SessionRepository sessionRepository;
+    private com.bookstore.repository.cassandra.SessionRepository sessionRepository;
 
     @Test
     void searchWithoutFilters_ReturnsOnlyActiveBooks() throws Exception {

@@ -86,8 +86,8 @@ export const PopularBooksAnalytics: React.FC = () => {
       render: (book: PopularBook) => (
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">{book.title}</div>
-          <div className="text-xs text-gray-500">{book.authorName} • {book.publisherName}</div>
-          <div className="text-xs text-gray-400">ISBN: {book.isbn}</div>
+          <div className="text-xs text-gray-500 dark:text-text-primary-dark/60">{book.authorName} • {book.publisherName}</div>
+          <div className="text-xs text-gray-400 dark:text-text-primary-dark/50">ISBN: {book.isbn}</div>
         </div>
       ),
     },
@@ -95,7 +95,7 @@ export const PopularBooksAnalytics: React.FC = () => {
       key: 'categoryName',
       label: 'Danh mục',
       render: (book: PopularBook) => (
-        <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 rounded">
+        <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-text-primary-dark rounded">
           {book.categoryName}
         </span>
       ),
@@ -116,7 +116,7 @@ export const PopularBooksAnalytics: React.FC = () => {
       key: 'totalRevenue',
       label: 'Doanh thu',
       render: (book: PopularBook) => (
-        <span className="font-bold text-green-600">{formatCurrency(book.totalRevenue)}</span>
+        <span className="font-bold text-green-600 dark:text-[#d4e9e2]">{formatCurrency(book.totalRevenue)}</span>
       ),
     },
     {
@@ -140,7 +140,7 @@ export const PopularBooksAnalytics: React.FC = () => {
       key: 'lastOrderDate',
       label: 'Bán gần nhất',
       render: (book: PopularBook) => (
-        <span className="text-sm text-gray-600">{formatDate(book.lastOrderDate)}</span>
+        <span className="text-sm text-gray-600 dark:text-text-primary-dark/70">{formatDate(book.lastOrderDate)}</span>
       ),
     },
   ];
@@ -180,37 +180,37 @@ export const PopularBooksAnalytics: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xl">💰</span>
-              <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">Tổng Doanh Thu</div>
+              <div className="text-sm text-gray-500 dark:text-text-primary-dark/60 uppercase tracking-wide font-semibold">Tổng Doanh Thu</div>
             </div>
-            <div className="text-2xl font-bold text-primary">{formatCurrency(totalRevenue)}</div>
-            <div className="text-xs text-gray-400 mt-1">Từ {filteredBooks.length} sách trong 90 ngày</div>
+            <div className="text-2xl font-bold text-primary dark:text-[#d4e9e2]">{formatCurrency(totalRevenue)}</div>
+            <div className="text-xs text-gray-400 dark:text-text-primary-dark/50 mt-1">Từ {filteredBooks.length} sách trong 90 ngày</div>
           </div>
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xl">📦</span>
-              <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">Đã Bán</div>
+              <div className="text-sm text-gray-500 dark:text-text-primary-dark/60 uppercase tracking-wide font-semibold">Đã Bán</div>
             </div>
-            <div className="text-2xl font-bold">{formatNumber(totalSold)}</div>
-            <div className="text-xs text-gray-400 mt-1">Tổng số cuốn đã bán ra</div>
+            <div className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">{formatNumber(totalSold)}</div>
+            <div className="text-xs text-gray-400 dark:text-text-primary-dark/50 mt-1">Tổng số cuốn đã bán ra</div>
           </div>
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xl">📊</span>
-              <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">Trung Bình/Sách</div>
+              <div className="text-sm text-gray-500 dark:text-text-primary-dark/60 uppercase tracking-wide font-semibold">Trung Bình/Sách</div>
             </div>
-            <div className="text-2xl font-bold">{formatCurrency(totalRevenue / (filteredBooks.length || 1))}</div>
-            <div className="text-xs text-gray-400 mt-1">Doanh thu trung bình mỗi đầu sách</div>
+            <div className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">{formatCurrency(totalRevenue / (filteredBooks.length || 1))}</div>
+            <div className="text-xs text-gray-400 dark:text-text-primary-dark/50 mt-1">Doanh thu trung bình mỗi đầu sách</div>
           </div>
         </div>
 
         {/* Filters */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex flex-wrap gap-4">
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium mb-2">Danh mục</label>
+            <label className="block text-sm font-medium mb-2 text-text-primary-light dark:text-text-primary-dark">Danh mục</label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-text-primary-light dark:text-text-primary-dark"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat === 'ALL' ? 'Tất cả' : cat}</option>
@@ -218,34 +218,34 @@ export const PopularBooksAnalytics: React.FC = () => {
             </select>
           </div>
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium mb-2">Sắp xếp theo</label>
+            <label className="block text-sm font-medium mb-2 text-text-primary-light dark:text-text-primary-dark">Sắp xếp theo</label>
             <div className="flex gap-2">
               <button
                 onClick={() => setSortBy('revenue')}
-                className={`px-4 py-2 rounded-lg ${
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   sortBy === 'revenue'
                     ? 'bg-primary text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-text-primary-light dark:text-text-primary-dark'
                 }`}
               >
                 Doanh thu
               </button>
               <button
                 onClick={() => setSortBy('quantity')}
-                className={`px-4 py-2 rounded-lg ${
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   sortBy === 'quantity'
                     ? 'bg-primary text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-text-primary-light dark:text-text-primary-dark'
                 }`}
               >
                 Số lượng
               </button>
               <button
                 onClick={() => setSortBy('orders')}
-                className={`px-4 py-2 rounded-lg ${
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   sortBy === 'orders'
                     ? 'bg-primary text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-text-primary-light dark:text-text-primary-dark'
                 }`}
               >
                 Đơn hàng

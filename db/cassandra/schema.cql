@@ -29,3 +29,47 @@ CREATE TABLE IF NOT EXISTS interaction_events (
     metadata text,
     PRIMARY KEY (id)
 );
+
+-- 3. interaction_events_by_type table
+CREATE TABLE IF NOT EXISTS interaction_events_by_type (
+    event_type text,
+    event_time timestamp,
+    id uuid,
+    user_id uuid,
+    book_id int,
+    metadata text,
+    PRIMARY KEY ((event_type), event_time, id)
+) WITH CLUSTERING ORDER BY (event_time DESC, id ASC);
+
+-- 4. interaction_events_by_bucket table
+CREATE TABLE IF NOT EXISTS interaction_events_by_bucket (
+    bucket text,
+    event_time timestamp,
+    id uuid,
+    user_id uuid,
+    book_id int,
+    event_type text,
+    metadata text,
+    PRIMARY KEY ((bucket), event_time, id)
+) WITH CLUSTERING ORDER BY (event_time DESC, id ASC);
+
+-- 5. user_sessions_by_bucket table
+CREATE TABLE IF NOT EXISTS user_sessions_by_bucket (
+    bucket text,
+    expires_at timestamp,
+    session_id uuid,
+    user_id uuid,
+    refresh_token text,
+    revoked boolean,
+    device_info text,
+    ip_address text,
+    created_at timestamp,
+    PRIMARY KEY ((bucket), expires_at, session_id)
+) WITH CLUSTERING ORDER BY (expires_at DESC, session_id ASC);
+
+-- 6. user_sessions_by_status table
+CREATE TABLE IF NOT EXISTS user_sessions_by_status (
+    status text,
+    session_id uuid,
+    PRIMARY KEY ((status), session_id)
+);

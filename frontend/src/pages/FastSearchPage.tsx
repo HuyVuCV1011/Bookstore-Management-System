@@ -119,7 +119,7 @@ export const FastSearchPage: React.FC = () => {
 
           {/* Autocomplete Suggestions */}
           {showSuggestions && suggestions.length > 0 && query && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border z-50 overflow-hidden">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border dark:border-gray-700 z-50 overflow-hidden">
               {suggestions.map((s, i) => (
                 <div
                   key={i}
@@ -128,11 +128,11 @@ export const FastSearchPage: React.FC = () => {
                     else setQuery(s.title);
                     setShowSuggestions(false);
                   }}
-                  className="px-6 py-4 hover:bg-primary/5 cursor-pointer flex items-center gap-3 border-b last:border-0"
+                  className="px-6 py-4 hover:bg-primary/5 dark:hover:bg-primary/10 cursor-pointer flex items-center gap-3 border-b dark:border-gray-700 last:border-0"
                 >
                   <span className="opacity-40">✨</span>
-                  <span className="font-medium">{s.title}</span>
-                  {s.bookId && <span className="text-xs text-text-secondary ml-auto uppercase font-mono">Xem chi tiết</span>}
+                  <span className="font-medium text-text-primary-light dark:text-text-primary-dark">{s.title}</span>
+                  {s.bookId && <span className="text-xs text-text-secondary dark:text-text-primary-dark/60 ml-auto uppercase font-mono">Xem chi tiết</span>}
                 </div>
               ))}
             </div>
@@ -142,12 +142,12 @@ export const FastSearchPage: React.FC = () => {
         {/* Trending Keywords */}
         {trending.length > 0 && (
           <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
-            <span className="text-xs font-bold uppercase tracking-widest text-text-secondary mr-2">Xu hướng:</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-secondary dark:text-text-primary-dark/60 mr-2">Xu hướng:</span>
             {trending.map((t, i) => (
               <button
                 key={i}
                 onClick={() => setQuery(t)}
-                className="px-4 py-2 bg-white dark:bg-gray-800 border rounded-full text-sm hover:border-primary hover:text-primary transition-all shadow-sm"
+                className="px-4 py-2 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-full text-sm text-text-primary-light dark:text-text-primary-dark hover:border-primary dark:hover:border-primary hover:text-primary dark:hover:text-primary transition-all shadow-sm"
               >
                 #{t}
               </button>
@@ -157,10 +157,10 @@ export const FastSearchPage: React.FC = () => {
 
         {perf !== null && (
           <div className="flex justify-between items-center mb-6 px-4">
-            <p className="text-sm text-text-secondary">
-              Tìm thấy <span className="font-bold text-text-primary-light">{results.length}</span> kết quả
+            <p className="text-sm text-text-secondary dark:text-text-primary-dark/60">
+              Tìm thấy <span className="font-bold text-text-primary-light dark:text-text-primary-dark">{results.length}</span> kết quả
             </p>
-            <p className="text-sm font-mono text-green-500 bg-green-50 px-3 py-1 rounded-full border border-green-100">
+            <p className="text-sm font-mono text-green-600 dark:text-[#d4e9e2] bg-green-50 dark:bg-green-950/30 px-3 py-1 rounded-full border border-green-100 dark:border-green-900/30">
               ⚡ Thời gian: {perf}ms
             </p>
           </div>
@@ -171,24 +171,25 @@ export const FastSearchPage: React.FC = () => {
             <div
               key={book.id}
               onClick={() => navigate(`/books/${book.id}`)}
-              className="flex gap-4 p-5 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border hover:border-primary hover:shadow-md transition-all cursor-pointer group"
+              className="flex gap-4 p-5 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border dark:border-gray-700 hover:border-primary dark:hover:border-primary hover:shadow-md transition-all cursor-pointer group"
             >
-              <div className="w-16 h-20 bg-gray-100 rounded flex items-center justify-center text-3xl group-hover:bg-primary/5 transition-colors">
+              <div className="w-16 h-20 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center text-3xl group-hover:bg-primary/5 dark:group-hover:bg-primary/10 transition-colors">
                 📖
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-lg line-clamp-1 group-hover:text-primary transition-colors">{book.title}</h3>
-                <p className="text-sm text-text-secondary">{book.authorName}</p>
+                <h3 className="font-bold text-lg line-clamp-1 text-text-primary-light dark:text-text-primary-dark group-hover:text-primary dark:group-hover:text-primary transition-colors">{book.title}</h3>
+                <p className="text-sm text-text-secondary dark:text-text-primary-dark/60">{book.authorName}</p>
                 <div className="flex items-center gap-3 mt-2">
-                  <span className="text-xs px-2 py-0.5 bg-gray-100 rounded text-text-secondary uppercase tracking-tight">
+                  <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-text-secondary dark:text-gray-300 uppercase tracking-tight">
                     {book.categoryName}
                   </span>
-                  <span className="font-black text-primary">{book.price?.toLocaleString('vi-VN')}₫</span>
+                  <span className="font-black text-primary dark:text-[#d4e9e2]">{book.price?.toLocaleString('vi-VN')}₫</span>
                 </div>
               </div>
             </div>
           ))}
         </div>
+
 
         {query && !loading && results.length === 0 && (
           <div className="text-center py-20 opacity-50">

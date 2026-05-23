@@ -2,6 +2,8 @@
 
 This document outlines the core functional capabilities of the Bookstore Management System.
 
+For the latest checked behavior and test evidence, see [Feature Verification Notes](feature-verification.md).
+
 ---
 
 ## 1. Catalog & Search Management

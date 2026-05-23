@@ -112,8 +112,9 @@ services:
       cassandra:
         condition: service_healthy
     command: >
-      /bin/sh -c "cqlsh cassandra -e \"CREATE KEYSPACE IF NOT EXISTS bookstore_events
+      /bin/sh -c "cqlsh cassandra -e \"CREATE KEYSPACE IF NOT EXISTS ${CASSANDRA_KEYSPACE:-bookstore_events}
       WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};\""
+
 
   backend:
     build:

@@ -1,4 +1,4 @@
-package com.bookstore.repository;
+package com.bookstore.repository.cassandra;
 
 import com.bookstore.entity.InteractionEvent;
 import org.springframework.data.cassandra.repository.CassandraRepository;

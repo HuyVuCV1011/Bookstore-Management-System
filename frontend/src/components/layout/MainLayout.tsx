@@ -27,20 +27,20 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             </Link>
 
             <nav className="hidden md:flex items-center gap-6">
-              <Link to="/cart" className="text-text-secondary hover:text-primary transition">Giỏ hàng</Link>
+              <Link to="/cart" className="text-text-secondary dark:text-text-primary-dark/60 hover:text-primary dark:hover:text-[#d4e9e2] transition">Giỏ hàng</Link>
               {user && (
                 <>
-                  <Link to="/wishlist" className="text-text-secondary hover:text-primary transition">Yêu thích</Link>
-                  <Link to="/orders" className="text-text-secondary hover:text-primary transition">Đơn hàng</Link>
+                  <Link to="/wishlist" className="text-text-secondary dark:text-text-primary-dark/60 hover:text-primary dark:hover:text-[#d4e9e2] transition">Yêu thích</Link>
+                  <Link to="/orders" className="text-text-secondary dark:text-text-primary-dark/60 hover:text-primary dark:hover:text-[#d4e9e2] transition">Đơn hàng</Link>
                 </>
               )}
-              <Link to="/demo/fast-search" className="text-primary font-medium hover:opacity-80 transition">⚡ Tìm nhanh</Link>
+              <Link to="/demo/fast-search" className="text-primary dark:text-[#d4e9e2] font-medium hover:opacity-80 transition">⚡ Tìm nhanh</Link>
             </nav>
 
             <div className="flex items-center gap-4">
               {user ? (
                 <div className="flex items-center gap-3">
-                  <Link to="/profile" className="hidden sm:flex items-center gap-2 text-sm text-text-secondary hover:text-primary transition">
+                  <Link to="/profile" className="hidden sm:flex items-center gap-2 text-sm text-text-secondary dark:text-text-primary-dark/60 hover:text-primary dark:hover:text-[#d4e9e2] transition">
                     <span className="text-lg">👤</span>
                     <span>{user.fullName}</span>
                   </Link>
@@ -69,7 +69,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
       {/* Footer */}
       <footer className="bg-white/50 dark:bg-gray-800/50 border-t mt-auto">
-        <div className="container mx-auto px-4 py-8 text-center text-text-secondary text-sm">
+        <div className="container mx-auto px-4 py-8 text-center text-text-secondary dark:text-text-primary-dark/50 text-sm">
           &copy; 2026 Nhà Sách - Dự án đa cơ sở dữ liệu. Xây dựng với React, Spring Boot, Postgres, Mongo & Redis.
         </div>
       </footer>

@@ -82,34 +82,45 @@ public class BookController {
             @RequestParam(required = false, defaultValue = "10") Integer size,
             @RequestParam(required = false) String keyword
     ) {
-        // Track search event if keyword is provided
-        if (keyword != null && !keyword.isBlank()) {
-            try {
-                UUID userId = getCurrentUserId();
-                if (userId != null) {
-                    // We'll track search with results count after fetching
-                    Pageable searchPageable = PageRequest.of(page, size, Sort.by("id").descending());
-                    Page<BookDetail> searchResults = bookSearchService.searchBooks(keyword, searchPageable);
-                    interactionEventService.trackSearch(userId, keyword, (int) searchResults.getTotalElements());
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+        Page<BookResponse> result;
+
+        if (useMongoForReads) {
+            Page<BookDetail> bookDetails = (keyword != null && !keyword.isBlank()) ?
+                    bookSearchService.searchBooks(keyword, pageable) :
+                    bookSearchService.getAllBooks(pageable);
+
+            result = bookDetails.map(bookDetailMapper::toBookResponse);
+
+            // Track search event if keyword is provided
+            if (keyword != null && !keyword.isBlank()) {
+                try {
+                    UUID userId = getCurrentUserId();
+                    if (userId != null) {
+                        interactionEventService.trackSearch(userId, keyword, (int) bookDetails.getTotalElements());
+                    }
+                } catch (Exception e) {
+                    // Don't fail the request if tracking fails
                 }
-            } catch (Exception e) {
-                // Don't fail the request if tracking fails
+            }
+        } else {
+            // Fallback to PostgreSQL
+            Page<BookResponse> pgResult = bookService.getAll(pageable, keyword);
+            result = pgResult;
+
+            // Track search event if keyword is provided
+            if (keyword != null && !keyword.isBlank()) {
+                try {
+                    UUID userId = getCurrentUserId();
+                    if (userId != null) {
+                        interactionEventService.trackSearch(userId, keyword, (int) pgResult.getTotalElements());
+                    }
+                } catch (Exception e) {
+                    // Don't fail the request if tracking fails
+                }
             }
         }
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-
-        if (useMongoForReads) {
-            Page<BookDetail> bookDetails = keyword != null && !keyword.isBlank() ?
-                bookSearchService.searchBooks(keyword, pageable) :
-                bookSearchService.getAllBooks(pageable);
-
-            Page<BookResponse> result = bookDetails.map(bookDetailMapper::toBookResponse);
-            return ResponseEntity.ok(PageResponse.of(result));
-        }
-
-        // Fallback to PostgreSQL
-        Page<BookResponse> result = bookService.getAll(pageable, keyword);
         return ResponseEntity.ok(PageResponse.of(result));
     }
 

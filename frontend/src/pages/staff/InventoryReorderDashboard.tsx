@@ -96,8 +96,8 @@ export const InventoryReorderDashboard: React.FC = () => {
       render: (item: InventoryReorderItem) => (
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">{item.title}</div>
-          <div className="text-xs text-gray-500">{item.authorName} • {item.categoryName}</div>
-          <div className="text-xs text-gray-400">ISBN: {item.isbn}</div>
+          <div className="text-xs text-gray-500 dark:text-text-primary-dark/60">{item.authorName} • {item.categoryName}</div>
+          <div className="text-xs text-gray-400 dark:text-text-primary-dark/50">ISBN: {item.isbn}</div>
         </div>
       ),
     },
@@ -110,7 +110,7 @@ export const InventoryReorderDashboard: React.FC = () => {
             {formatNumber(item.currentStock)}
           </span>
           {item.currentStock === 0 && <div className="text-xs text-red-600 font-normal">⚠️ HẾT HÀNG</div>}
-          {item.currentStock > 0 && <div className="text-xs text-gray-400">cuốn</div>}
+          {item.currentStock > 0 && <div className="text-xs text-gray-400 dark:text-text-primary-dark/50">cuốn</div>}
         </div>
       ),
     },
@@ -119,8 +119,8 @@ export const InventoryReorderDashboard: React.FC = () => {
       label: 'Tốc độ bán (30 ngày)',
       render: (item: InventoryReorderItem) => (
         <div>
-          <div className="font-bold text-primary">{item.avgDailySales.toFixed(1)} cuốn/ngày</div>
-          <div className="text-xs text-gray-500">📊 Tổng: {formatNumber(item.totalSoldLast30Days)} cuốn</div>
+          <div className="font-bold text-primary dark:text-[#d4e9e2]">{item.avgDailySales.toFixed(1)} cuốn/ngày</div>
+          <div className="text-xs text-gray-500 dark:text-text-primary-dark/60">📊 Tổng: {formatNumber(item.totalSoldLast30Days)} cuốn</div>
         </div>
       ),
     },
@@ -135,7 +135,7 @@ export const InventoryReorderDashboard: React.FC = () => {
             <div className={`font-bold ${color}`}>
               {days >= 999 ? '∞' : Math.floor(days)}
             </div>
-            <div className="text-xs font-normal text-gray-500">
+            <div className="text-xs font-normal text-gray-500 dark:text-text-primary-dark/60">
               {days >= 999 ? 'không giới hạn' : 'ngày'}
             </div>
           </div>
@@ -147,10 +147,10 @@ export const InventoryReorderDashboard: React.FC = () => {
       label: 'Đề xuất đặt hàng',
       render: (item: InventoryReorderItem) => (
         <div>
-          <span className={`font-bold ${item.recommendedReorderQuantity > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+          <span className={`font-bold ${item.recommendedReorderQuantity > 0 ? 'text-green-600 dark:text-[#d4e9e2]' : 'text-gray-400 dark:text-text-primary-dark/50'}`}>
             {item.recommendedReorderQuantity > 0 ? formatNumber(item.recommendedReorderQuantity) : '—'}
           </span>
-          {item.recommendedReorderQuantity > 0 && <div className="text-xs text-gray-400">cuốn</div>}
+          {item.recommendedReorderQuantity > 0 && <div className="text-xs text-gray-400 dark:text-text-primary-dark/50">cuốn</div>}
         </div>
       ),
     },
@@ -159,10 +159,10 @@ export const InventoryReorderDashboard: React.FC = () => {
       label: 'Đang đặt hàng',
       render: (item: InventoryReorderItem) => (
         <div>
-          <span className={item.pendingPurchaseQuantity > 0 ? 'font-semibold text-blue-600' : 'text-gray-400'}>
+          <span className={item.pendingPurchaseQuantity > 0 ? 'font-semibold text-blue-600 dark:text-blue-300' : 'text-gray-400 dark:text-text-primary-dark/50'}>
             {item.pendingPurchaseQuantity > 0 ? formatNumber(item.pendingPurchaseQuantity) : '—'}
           </span>
-          {item.pendingPurchaseQuantity > 0 && <div className="text-xs text-gray-400">cuốn</div>}
+          {item.pendingPurchaseQuantity > 0 && <div className="text-xs text-gray-400 dark:text-text-primary-dark/50">cuốn</div>}
         </div>
       ),
     },
@@ -170,7 +170,7 @@ export const InventoryReorderDashboard: React.FC = () => {
       key: 'lastSaleDate',
       label: 'Bán lần cuối',
       render: (item: InventoryReorderItem) => (
-        <span className="text-sm text-gray-600">{formatDate(item.lastSaleDate)}</span>
+        <span className="text-sm text-gray-600 dark:text-text-primary-dark/70">{formatDate(item.lastSaleDate)}</span>
       ),
     },
   ];
@@ -181,10 +181,10 @@ export const InventoryReorderDashboard: React.FC = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Cảnh Báo Đặt Hàng Lại</h1>
-            <p className="text-sm text-gray-500 mt-1">Theo dõi tồn kho và tốc độ bán hàng 30 ngày qua</p>
+            <h1 className="text-3xl font-bold text-text-primary-light dark:text-text-primary-dark">Cảnh Báo Đặt Hàng Lại</h1>
+            <p className="text-sm text-gray-500 dark:text-text-primary-dark/60 mt-1">Theo dõi tồn kho và tốc độ bán hàng 30 ngày qua</p>
             {items.length > 0 && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-400 dark:text-text-primary-dark/50 mt-1">
                 Cập nhật: {formatDate(items[0].lastRefreshTime)}
               </p>
             )}
@@ -244,7 +244,7 @@ export const InventoryReorderDashboard: React.FC = () => {
 
         {/* Priority Filter */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <label className="block text-sm font-medium mb-3">Lọc theo mức độ ưu tiên</label>
+          <label className="block text-sm font-medium mb-3 text-text-primary-light dark:text-text-primary-dark">Lọc theo mức độ ưu tiên</label>
           <div className="flex flex-wrap gap-2">
             {['ALL', 'URGENT', 'HIGH', 'MEDIUM', 'LOW'].map(priority => (
               <button
@@ -253,7 +253,7 @@ export const InventoryReorderDashboard: React.FC = () => {
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   selectedPriority === priority
                     ? 'bg-primary text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-text-primary-light dark:text-text-primary-dark'
                 }`}
               >
                 {priority === 'ALL' ? 'Tất cả' : getPriorityText(priority)}
@@ -271,9 +271,9 @@ export const InventoryReorderDashboard: React.FC = () => {
 
         {items.length === 0 && !loading && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
-            <div className="text-6xl mb-4">✓</div>
-            <div className="text-2xl font-bold mb-2">Tất cả đều ổn!</div>
-            <div className="text-gray-500">Không có sản phẩm nào cần đặt hàng lại ở mức độ này</div>
+            <div className="text-6xl mb-4 text-[#00754A] dark:text-[#d4e9e2]">✓</div>
+            <div className="text-2xl font-bold mb-2 text-text-primary-light dark:text-text-primary-dark">Tất cả đều ổn!</div>
+            <div className="text-gray-500 dark:text-text-primary-dark/60">Không có sản phẩm nào cần đặt hàng lại ở mức độ này</div>
           </div>
         )}
       </div>

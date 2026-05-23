@@ -49,7 +49,7 @@ export const ProfilePage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-bg-light via-gray-50 to-blue-50 dark:from-bg-dark dark:via-gray-900 dark:to-blue-900 py-8">
         <div className="container mx-auto px-4">
-          <p className="text-center">Đang tải thông tin...</p>
+          <p className="text-center text-text-primary-light dark:text-text-primary-dark">Đang tải thông tin...</p>
         </div>
       </div>
     );

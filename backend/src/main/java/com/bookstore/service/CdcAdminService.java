@@ -2,9 +2,13 @@ package com.bookstore.service;
 
 import com.bookstore.dto.response.CdcStatusResponse;
 import com.bookstore.dto.response.CdcStatsResponse;
+import com.bookstore.entity.OutboxEvent;
+import com.bookstore.entity.OutboxStatus;
 import com.bookstore.event.ChangeType;
+import com.bookstore.exception.ResourceNotFoundException;
 import com.bookstore.mapper.BookDetailMapper;
 import com.bookstore.repository.BookRepository;
+import com.bookstore.repository.OutboxEventRepository;
 import com.bookstore.repository.mongodb.BookDetailRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +21,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -29,18 +34,21 @@ public class CdcAdminService {
     private final BookDetailMapper mapper;
     private final ThreadPoolTaskExecutor cdcExecutor;
     private final MongoTemplate mongoTemplate;
+    private final OutboxEventRepository outboxEventRepository;
+    private final OutboxEventProcessor outboxEventProcessor;
 
     @Value("${bookstore.cdc.auto-sync-on-startup:true}")
     private boolean autoSyncOnStartup;
 
     public CdcStatusResponse getStatus() {
         boolean mongoConnected = checkMongoConnection();
-        int queueDepth = cdcExecutor.getThreadPoolExecutor().getQueue().size();
+        long pendingCount = outboxEventRepository.countByStatus(OutboxStatus.PENDING);
+        long failureCount = outboxEventRepository.countByStatus(OutboxStatus.FAILED);
 
         String status;
         if (!mongoConnected) {
             status = "DOWN";
-        } else if (queueDepth > 50) {
+        } else if (pendingCount > 50 || failureCount > 0) {
             status = "DEGRADED";
         } else {
             status = "HEALTHY";
@@ -50,7 +58,7 @@ public class CdcAdminService {
                 .enabled(true)
                 .mongoConnected(mongoConnected)
                 .lastSyncTime(LocalDateTime.now())
-                .queueDepth(queueDepth)
+                .queueDepth((int) pendingCount)
                 .status(status)
                 .build();
     }
@@ -59,10 +67,15 @@ public class CdcAdminService {
         long postgresCount = bookRepository.count();
         long mongoCount = bookDetailRepository.count();
 
-        // TODO: Track success/failure counts with metrics
-        long successCount = 0;
-        long failureCount = 0;
+        long successCount = outboxEventRepository.countByStatus(OutboxStatus.COMPLETED);
+        long failureCount = outboxEventRepository.countByStatus(OutboxStatus.FAILED);
+
         double successRate = 0.0;
+        long totalProcessed = successCount + failureCount;
+        if (totalProcessed > 0) {
+            successRate = (double) successCount / totalProcessed;
+        }
+
         double avgDuration = 0.0;
 
         return CdcStatsResponse.builder()
@@ -73,6 +86,38 @@ public class CdcAdminService {
                 .successRate(successRate)
                 .avgSyncDurationMs(avgDuration)
                 .build();
+    }
+
+    public List<OutboxEvent> getOutboxEvents(OutboxStatus status) {
+        if (status != null) {
+            return outboxEventRepository.findByStatusOrderByCreatedAtAsc(status);
+        }
+        return outboxEventRepository.findAll();
+    }
+
+    public void retryOutboxEvent(Integer id) {
+        log.info("[CDC-Admin] Manual outbox event retry requested for id {}", id);
+        OutboxEvent event = outboxEventRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Outbox event not found: " + id));
+
+        // Reset attempts and status to PENDING
+        event.setStatus(OutboxStatus.PENDING);
+        event.setAttempts(0);
+        outboxEventRepository.save(event);
+
+        // Process synchronously for immediate feedback
+        outboxEventProcessor.processSingleEvent(event);
+    }
+
+    public void retryAllFailedOutboxEvents() {
+        log.info("[CDC-Admin] Manual bulk retry requested for all failed outbox events");
+        List<OutboxEvent> failedEvents = outboxEventRepository.findByStatusOrderByCreatedAtAsc(OutboxStatus.FAILED);
+        for (OutboxEvent event : failedEvents) {
+            event.setStatus(OutboxStatus.PENDING);
+            event.setAttempts(0);
+        }
+        outboxEventRepository.saveAll(failedEvents);
+        log.info("[CDC-Admin] Reset {} failed outbox events to PENDING", failedEvents.size());
     }
 
     public void syncSingleBook(Integer bookId) {

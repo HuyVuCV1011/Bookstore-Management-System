@@ -35,6 +35,7 @@ public class OrderService {
     private final CustomerRepository customerRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
+    private final InventoryService inventoryService;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
@@ -57,7 +58,7 @@ public class OrderService {
 
         // Process order items
         for (CreateOrderRequest.OrderItemRequest itemRequest : request.getItems()) {
-            Book book = bookRepository.findById(itemRequest.getBookId())
+            Book book = bookRepository.findByIdForUpdate(itemRequest.getBookId())
                     .orElseThrow(() -> new ResourceNotFoundException("Book not found with id: " + itemRequest.getBookId()));
 
             // Check stock availability
@@ -68,10 +69,7 @@ public class OrderService {
                 );
             }
 
-            // Update stock
-            book.setStockQuantity(book.getStockQuantity() - itemRequest.getQuantity());
-            bookRepository.save(book);
-
+            // Stock checking under lock (actual mutation is deferred until order is saved to get its UUID)
             BigDecimal lineTotal = book.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             subtotalAmount = subtotalAmount.add(lineTotal);
 
@@ -97,11 +95,11 @@ public class OrderService {
         String orderCode = generateOrderCode();
 
         // Determine payment status based on payment method
-        // If payment method is BANK_TRANSFER, CREDIT_CARD, or E_WALLET, set to PAID
+        // If payment method is BANK_TRANSFER, CREDIT_CARD, or E_WALLET, set to PENDING (awaiting gateway/callback confirmation)
         // If payment method is CASH, set to UNPAID (COD - Cash on Delivery)
         PaymentStatus paymentStatus = (request.getPaymentMethod() == PaymentMethod.CASH)
                 ? PaymentStatus.UNPAID
-                : PaymentStatus.PAID;
+                : PaymentStatus.PENDING;
 
         // Create order
         CustomerOrder order = CustomerOrder.builder()
@@ -124,6 +122,17 @@ public class OrderService {
         }
 
         order = orderRepository.save(order);
+        
+        // Record sale transactions and update stock atomically through InventoryService
+        for (OrderItem item : order.getItems()) {
+            inventoryService.recordSaleTransaction(
+                    item.getBook().getId(),
+                    item.getQuantity(),
+                    order.getId(),
+                    currentUserId
+            );
+        }
+        
         log.info("Order created - orderId: {}, orderCode: {}, totalAmount: {}",
                 order.getId(), order.getOrderCode(), totalAmount);
 
@@ -164,8 +173,33 @@ public class OrderService {
         CustomerOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
-        order.setStatus(request.getOrderStatus());
+        OrderStatusPolicy.validateTransition(order.getStatus(), request.getOrderStatus());
+
+        if (request.getOrderStatus() == OrderStatus.CANCELLED) {
+            cancelOrder(orderId);
+            order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+        } else {
+            order.setStatus(request.getOrderStatus());
+            order = orderRepository.save(order);
+        }
+
+        Customer customer = customerRepository.findByUserId(order.getUser().getId()).orElse(null);
+        return mapToResponse(order, customer);
+    }
+
+    @Transactional
+    public OrderResponse confirmOrderPayment(UUID orderId) {
+        CustomerOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new IllegalStateException("Order is already paid");
+        }
+
+        order.setPaymentStatus(PaymentStatus.PAID);
         order = orderRepository.save(order);
+        log.info("Order payment confirmed - orderId: {}, orderCode: {}", order.getId(), order.getOrderCode());
 
         Customer customer = customerRepository.findByUserId(order.getUser().getId()).orElse(null);
         return mapToResponse(order, customer);
@@ -183,15 +217,21 @@ public class OrderService {
             throw new ResourceNotFoundException("Order not found with id: " + orderId);
         }
 
-        if (order.getStatus() == OrderStatus.SHIPPED || order.getStatus() == OrderStatus.COMPLETED) {
-            throw new IllegalStateException("Cannot cancel order after shipment");
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            log.info("Order already cancelled, skipping stock restoration - orderId: {}", orderId);
+            return;
         }
 
-        // Restore stock
+        OrderStatusPolicy.validateTransition(order.getStatus(), OrderStatus.CANCELLED);
+
+        // Restore stock and record compensating cancellation transaction through InventoryService
         for (OrderItem item : order.getItems()) {
-            Book book = item.getBook();
-            book.setStockQuantity(book.getStockQuantity() + item.getQuantity());
-            bookRepository.save(book);
+            inventoryService.recordCancelTransaction(
+                    item.getBook().getId(),
+                    item.getQuantity(),
+                    order.getId(),
+                    currentUser.getId()
+            );
         }
 
         order.setStatus(OrderStatus.CANCELLED);

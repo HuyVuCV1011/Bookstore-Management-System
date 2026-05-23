@@ -11,7 +11,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Configuration
 @EnableJpaRepositories(
         basePackages = "com.bookstore.repository",
-        transactionManagerRef = "transactionManager"
+        transactionManagerRef = "transactionManager",
+        excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
+                type = org.springframework.context.annotation.FilterType.REGEX,
+                pattern = {
+                        "com\\.bookstore\\.repository\\.mongodb\\..*",
+                        "com\\.bookstore\\.repository\\.cassandra\\..*"
+                }
+        )
 )
 public class JpaConfig {
 

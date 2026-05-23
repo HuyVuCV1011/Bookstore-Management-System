@@ -8,6 +8,9 @@ group = 'com.bookstore'
 version = '0.0.1-SNAPSHOT'
 
 ext['lombok.version'] = '1.18.40'
+// Override Mockito and Byte Buddy to ensure compatibility with modern JDKs (JDK 21+) for bytecode instrumentation
+ext['mockito.version'] = '5.23.0'
+ext['byte-buddy.version'] = '1.17.5'
 
 
 java {
@@ -65,6 +68,9 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 }
 
 tasks.named('test') {

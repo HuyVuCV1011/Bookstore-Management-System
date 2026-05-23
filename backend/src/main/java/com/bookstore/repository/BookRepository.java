@@ -4,9 +4,11 @@ import com.bookstore.entity.Book;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +16,9 @@ import java.math.BigDecimal;
 
 @Repository
 public interface BookRepository extends JpaRepository<Book, Integer> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Book b WHERE b.id = :id AND b.deletedAt IS NULL")
+    Optional<Book> findByIdForUpdate(@Param("id") Integer id);
     @Query("SELECT b FROM Book b WHERE b.deletedAt IS NULL")
     Page<Book> findAll(Pageable pageable);
 

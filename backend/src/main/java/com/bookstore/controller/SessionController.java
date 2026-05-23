@@ -5,22 +5,23 @@ import com.bookstore.dto.response.SessionStatsDTO;
 import com.bookstore.dto.response.SessionWithUserDTO;
 import com.bookstore.entity.SessionEntity;
 import com.bookstore.entity.User;
-import com.bookstore.repository.SessionRepository;
+import com.bookstore.entity.UserSessionByBucket;
+import com.bookstore.repository.cassandra.SessionRepository;
+import com.bookstore.repository.cassandra.UserSessionByBucketRepository;
+import com.bookstore.repository.cassandra.UserSessionByStatusRepository;
 import com.bookstore.repository.UserRepository;
-import com.bookstore.service.RefreshTokenService;
+import com.bookstore.service.SessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.cassandra.core.CassandraTemplate;
-import org.springframework.data.cassandra.core.query.Query;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -34,9 +35,10 @@ import java.util.stream.Collectors;
 public class SessionController {
 
     private final SessionRepository sessionRepository;
+    private final UserSessionByBucketRepository bucketRepository;
+    private final UserSessionByStatusRepository statusRepository;
     private final UserRepository userRepository;
-    private final CassandraTemplate cassandraTemplate;
-    private final RefreshTokenService refreshTokenService;
+    private final SessionService sessionService;
 
     @GetMapping
     public ResponseEntity<Page<SessionWithUserDTO>> getSessions(
@@ -45,69 +47,99 @@ public class SessionController {
             @RequestParam(required = false) String email
     ) {
         try {
-            log.debug("Fetching sessions - page: {}, size: {}, email: {}", page, size, email);
+            log.debug("Fetching sessions (optimized) - page: {}, size: {}, email: {}", page, size, email);
 
-            // Get all sessions from Cassandra using CassandraTemplate
-            List<SessionEntity> allSessions = cassandraTemplate.select(Query.empty(), SessionEntity.class);
-            log.debug("Found {} total sessions in Cassandra", allSessions.size());
+            List<SessionWithUserDTO> sessionDTOs = new ArrayList<>();
+            long totalElements = 0;
+            boolean hasNext = false;
 
-            // Convert to DTOs with user info and apply filters
-            List<SessionWithUserDTO> sessionDTOs = allSessions.stream()
-                    .map(session -> {
-                        String userEmail = "Unknown";
-                        try {
-                            User user = userRepository.findById(session.getUserId()).orElse(null);
-                            if (user != null) {
-                                userEmail = user.getEmail();
-                            }
-                        } catch (Exception e) {
-                            log.warn("Failed to fetch user for session {}", session.getSessionId(), e);
-                        }
+            if (email != null && !email.trim().isEmpty()) {
+                // 1. Search users by email in Postgres
+                List<User> matchingUsers = userRepository.findByEmailContainingIgnoreCase(email.trim());
+                if (matchingUsers.isEmpty()) {
+                    return ResponseEntity.ok(new PageImpl<>(Collections.emptyList(), PageRequest.of(page, size), 0L));
+                }
 
-                        return SessionWithUserDTO.builder()
-                                .sessionId(session.getSessionId().toString())
-                                .userId(session.getUserId())
-                                .userEmail(userEmail)
-                                .deviceInfo(session.getDeviceInfo())
-                                .ipAddress(session.getIpAddress())
-                                .revoked(session.getRevoked())
-                                .createdAt(LocalDateTime.ofInstant(session.getCreatedAt(), ZoneId.systemDefault()))
-                                .expiresAt(LocalDateTime.ofInstant(session.getExpiresAt(), ZoneId.systemDefault()))
-                                .build();
-                    })
-                    .filter(dto -> {
-                        // Apply email filter if provided (search email only)
-                        if (email != null && !email.trim().isEmpty()) {
-                            String searchTerm = email.toLowerCase().trim();
-                            return dto.getUserEmail().toLowerCase().contains(searchTerm);
-                        }
-                        return true;
-                    })
-                    .sorted((a, b) -> b.getExpiresAt().compareTo(a.getExpiresAt())) // Sort by expiresAt DESC (latest first)
-                    .collect(Collectors.toList());
+                // 2. Fetch sessions for matching users using secondary index (findByUserId)
+                List<SessionEntity> matchingSessions = new ArrayList<>();
+                for (User user : matchingUsers) {
+                    matchingSessions.addAll(sessionRepository.findByUserId(user.getId()));
+                }
 
-            log.debug("After filtering and sorting: {} sessions", sessionDTOs.size());
+                // 3. Sort matching sessions by expiresAt DESC
+                matchingSessions.sort((a, b) -> b.getExpiresAt().compareTo(a.getExpiresAt()));
+                totalElements = matchingSessions.size();
 
-            // Simple pagination in memory
-            int start = page * size;
-            int end = Math.min(start + size, sessionDTOs.size());
-            List<SessionWithUserDTO> pageContent = start < sessionDTOs.size()
-                    ? sessionDTOs.subList(start, end)
-                    : Collections.emptyList();
+                // 4. Bounded pagination in-memory for matching subset
+                int start = page * size;
+                int end = Math.min(start + size, matchingSessions.size());
+                List<SessionEntity> pageContent = start < matchingSessions.size()
+                        ? matchingSessions.subList(start, end)
+                        : Collections.emptyList();
 
-            Pageable pageable = PageRequest.of(page, size);
+                // Batch enrichment: Fetch all user profiles for this page in 1 single Jpa query to avoid N+1
+                Set<UUID> userIds = pageContent.stream().map(SessionEntity::getUserId).collect(Collectors.toSet());
+                Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
+                        .collect(Collectors.toMap(User::getId, u -> u));
+
+                for (SessionEntity session : pageContent) {
+                    User user = userMap.get(session.getUserId());
+                    String userEmail = user != null ? user.getEmail() : "Unknown";
+
+                    sessionDTOs.add(SessionWithUserDTO.builder()
+                            .sessionId(session.getSessionId().toString())
+                            .userId(session.getUserId())
+                            .userEmail(userEmail)
+                            .deviceInfo(session.getDeviceInfo())
+                            .ipAddress(session.getIpAddress())
+                            .revoked(session.getRevoked())
+                            .createdAt(LocalDateTime.ofInstant(session.getCreatedAt(), ZoneId.systemDefault()))
+                            .expiresAt(LocalDateTime.ofInstant(session.getExpiresAt(), ZoneId.systemDefault()))
+                            .build());
+                }
+            } else {
+                // No email search: query all sessions via bucket table using server-side paging (Slice)
+                Pageable pageable = PageRequest.of(page, size);
+                Slice<UserSessionByBucket> slice = bucketRepository.findByBucket("all", pageable);
+                hasNext = slice.hasNext();
+                List<UserSessionByBucket> content = slice.getContent();
+
+                // Batch enrichment: Fetch all user profiles for this page in 1 single Jpa query to avoid N+1
+                Set<UUID> userIds = content.stream().map(UserSessionByBucket::getUserId).collect(Collectors.toSet());
+                Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
+                        .collect(Collectors.toMap(User::getId, u -> u));
+
+                for (UserSessionByBucket session : content) {
+                    User user = userMap.get(session.getUserId());
+                    String userEmail = user != null ? user.getEmail() : "Unknown";
+
+                    sessionDTOs.add(SessionWithUserDTO.builder()
+                            .sessionId(session.getSessionId().toString())
+                            .userId(session.getUserId())
+                            .userEmail(userEmail)
+                            .deviceInfo(session.getDeviceInfo())
+                            .ipAddress(session.getIpAddress())
+                            .revoked(session.getRevoked())
+                            .createdAt(LocalDateTime.ofInstant(session.getCreatedAt(), ZoneId.systemDefault()))
+                            .expiresAt(LocalDateTime.ofInstant(session.getExpiresAt(), ZoneId.systemDefault()))
+                            .build());
+                }
+
+                totalElements = (long) (page * size) + sessionDTOs.size() + (hasNext ? size : 0);
+            }
+
+            Pageable resultPageable = PageRequest.of(page, size);
             Page<SessionWithUserDTO> sessionsPage = new PageImpl<>(
-                    pageContent,
-                    pageable,
-                    sessionDTOs.size()
+                    sessionDTOs,
+                    resultPageable,
+                    totalElements
             );
 
-            log.info("Returning {} sessions for page {}", pageContent.size(), page);
+            log.info("Returning {} sessions for page {}", sessionDTOs.size(), page);
             return ResponseEntity.ok(sessionsPage);
 
         } catch (Exception e) {
             log.error("Error fetching sessions", e);
-            // Return empty page on error
             return ResponseEntity.ok(new PageImpl<>(
                     Collections.emptyList(),
                     PageRequest.of(page, size),
@@ -119,23 +151,12 @@ public class SessionController {
     @GetMapping("/stats")
     public ResponseEntity<SessionStatsDTO> getStats() {
         try {
-            log.debug("Fetching session statistics");
+            log.debug("Fetching session statistics (optimized)");
 
-            List<SessionEntity> allSessions = cassandraTemplate.select(Query.empty(), SessionEntity.class);
-            Instant now = Instant.now();
-
-            long totalSessions = allSessions.size();
-            long activeSessions = allSessions.stream()
-                    .filter(s -> !Boolean.TRUE.equals(s.getRevoked()))
-                    .filter(s -> s.getExpiresAt().isAfter(now))
-                    .count();
-            long revokedSessions = allSessions.stream()
-                    .filter(s -> Boolean.TRUE.equals(s.getRevoked()))
-                    .count();
-            long expiredSessions = allSessions.stream()
-                    .filter(s -> !Boolean.TRUE.equals(s.getRevoked()))
-                    .filter(s -> s.getExpiresAt().isBefore(now))
-                    .count();
+            long activeSessions = statusRepository.countByStatus("active");
+            long revokedSessions = statusRepository.countByStatus("revoked");
+            long totalSessions = activeSessions + revokedSessions;
+            long expiredSessions = 0L; // automatically removed by Cassandra TTL
 
             SessionStatsDTO stats = SessionStatsDTO.builder()
                     .totalSessions(totalSessions)
@@ -150,7 +171,6 @@ public class SessionController {
 
         } catch (Exception e) {
             log.error("Error fetching session stats", e);
-            // Return zero stats on error
             return ResponseEntity.ok(SessionStatsDTO.builder()
                     .totalSessions(0L)
                     .activeSessions(0L)
@@ -177,21 +197,8 @@ public class SessionController {
 
             SessionEntity session = sessionOpt.get();
 
-            // Update revoked status in Cassandra
-            session.setRevoked(true);
-            sessionRepository.save(session);
-
-            // Also delete the refresh token from PostgreSQL to actually log out the user
-            try {
-                String refreshToken = session.getRefreshToken();
-                if (refreshToken != null && !refreshToken.isEmpty()) {
-                    refreshTokenService.deleteByToken(refreshToken);
-                    log.debug("Deleted refresh token for session: {}", sessionId);
-                }
-            } catch (Exception e) {
-                log.warn("Failed to delete refresh token for session {}: {}", sessionId, e.getMessage());
-                // Continue anyway - Cassandra session is revoked
-            }
+            // Revoke in Cassandra (delegated to SessionService to keep other tables in sync)
+            sessionService.revokeSession(session);
 
             log.info("Session revoked successfully: {}", sessionId);
             return ResponseEntity.ok(MessageResponse.builder()

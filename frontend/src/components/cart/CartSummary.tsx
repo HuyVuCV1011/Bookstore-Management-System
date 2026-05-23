@@ -19,14 +19,14 @@ export const CartSummary: React.FC = () => {
 
       <div className="space-y-3 mb-4">
         <div className="flex justify-between text-sm">
-          <span className="text-text-secondary">Số lượng sản phẩm:</span>
+          <span className="text-text-secondary dark:text-text-primary-dark/60">Số lượng sản phẩm:</span>
           <span className="font-semibold text-text-primary-light dark:text-text-primary-dark">
             {cart.totalItems}
           </span>
         </div>
 
         <div className="flex justify-between text-sm">
-          <span className="text-text-secondary">Tạm tính:</span>
+          <span className="text-text-secondary dark:text-text-primary-dark/60">Tạm tính:</span>
           <span className="font-semibold text-text-primary-light dark:text-text-primary-dark">
             {cart.totalAmount.toLocaleString('vi-VN')} đ
           </span>
@@ -38,7 +38,7 @@ export const CartSummary: React.FC = () => {
           <span className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
             Tổng cộng:
           </span>
-          <span className="text-2xl font-bold text-primary">
+          <span className="text-2xl font-bold text-primary dark:text-[#d4e9e2]">
             {cart.totalAmount.toLocaleString('vi-VN')} đ
           </span>
         </div>
@@ -52,7 +52,7 @@ export const CartSummary: React.FC = () => {
         🎉 Tiến hành thanh toán
       </button>
 
-      <p className="text-xs text-text-secondary text-center mt-4">
+      <p className="text-xs text-text-secondary dark:text-text-primary-dark/60 text-center mt-4">
         Phí vận chuyển sẽ được tính ở bước thanh toán
       </p>
     </div>

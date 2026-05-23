@@ -17,11 +17,26 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Testcontainers
 class PurchaseOrderRepositoryTest {
+
+// Use Testcontainers to spin up an isolated PostgreSQL instance for repository testing,
+// avoiding dependence on any external running database instance.
+@Container
+@ServiceConnection
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
+            .withDatabaseName("bookstore")
+            .withUsername("bookstore_user")
+            .withPassword("password");
 
     @Autowired
     private TestEntityManager entityManager;

@@ -1,13 +1,20 @@
 package com.bookstore.service;
 
 import com.bookstore.entity.InteractionEvent;
-import com.bookstore.repository.InteractionEventRepository;
+import com.bookstore.entity.InteractionEventByType;
+import com.bookstore.entity.InteractionEventByBucket;
+import com.bookstore.repository.cassandra.InteractionEventRepository;
+import com.bookstore.repository.cassandra.InteractionEventByTypeRepository;
+import com.bookstore.repository.cassandra.InteractionEventByBucketRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Slf4j
@@ -16,6 +23,9 @@ import java.util.UUID;
 public class InteractionEventService {
 
     private final InteractionEventRepository interactionEventRepository;
+    private final InteractionEventByTypeRepository interactionEventByTypeRepository;
+    private final InteractionEventByBucketRepository interactionEventByBucketRepository;
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * Track user interaction event asynchronously
@@ -25,22 +35,89 @@ public class InteractionEventService {
         try {
             log.info("=== TRACKING EVENT START === type: {}, userId: {}, bookId: {}", eventType, userId, bookId);
 
+            UUID id = UUID.randomUUID();
+            Instant eventTime = Instant.now();
+            String meta = metadata != null ? metadata : "{}";
+
+            // 1. Save to primary table
             InteractionEvent event = InteractionEvent.builder()
-                    .id(UUID.randomUUID())
+                    .id(id)
                     .userId(userId)
                     .bookId(bookId)
                     .eventType(eventType)
-                    .eventTime(Instant.now())
-                    .metadata(metadata != null ? metadata : "{}")
+                    .eventTime(eventTime)
+                    .metadata(meta)
                     .build();
-
-            log.info("Event object created: {}", event);
             interactionEventRepository.save(event);
+
+            // 2. Save to query-oriented type table
+            InteractionEventByType typeEvent = InteractionEventByType.builder()
+                    .eventType(eventType)
+                    .eventTime(eventTime)
+                    .id(id)
+                    .userId(userId)
+                    .bookId(bookId)
+                    .metadata(meta)
+                    .build();
+            interactionEventByTypeRepository.save(typeEvent);
+
+            // 3. Save to query-oriented bucket table
+            InteractionEventByBucket bucketEvent = InteractionEventByBucket.builder()
+                    .bucket("all")
+                    .eventTime(eventTime)
+                    .id(id)
+                    .userId(userId)
+                    .bookId(bookId)
+                    .eventType(eventType)
+                    .metadata(meta)
+                    .build();
+            interactionEventByBucketRepository.save(bucketEvent);
+
+            // 4. Maintain Redis aggregates for high-speed admin stats
+            maintainRedisMetrics(userId, bookId, eventType);
+
             log.info("=== TRACKING EVENT SUCCESS === Tracked {} event - userId: {}, bookId: {}", eventType, userId, bookId);
         } catch (Exception e) {
             log.error("=== TRACKING EVENT FAILED === type: {}, userId: {}, bookId: {}",
                     eventType, userId, bookId, e);
-            // Don't fail the main request if event tracking fails
+        }
+    }
+
+    private void maintainRedisMetrics(UUID userId, Integer bookId, String eventType) {
+        try {
+            // General counters
+            redisTemplate.opsForValue().increment("stats:events:total");
+
+            String todayStr = LocalDate.now().toString();
+            String todayKey = "stats:events:today:" + todayStr;
+            Long todayCount = redisTemplate.opsForValue().increment(todayKey);
+            if (todayCount != null && todayCount == 1) {
+                redisTemplate.expire(todayKey, Duration.ofHours(48));
+            }
+
+            if (userId != null) {
+                redisTemplate.opsForSet().add("stats:events:unique_users", userId.toString());
+            }
+
+            // Event distribution hash
+            redisTemplate.opsForHash().increment("stats:events:distribution", eventType, 1L);
+
+            // Top Books ZSets
+            if (bookId != null && bookId > 0) {
+                String metric = switch (eventType) {
+                    case "VIEW" -> "views";
+                    case "CLICK" -> "clicks";
+                    case "ADD_TO_CART" -> "cart";
+                    case "PURCHASE" -> "purchases";
+                    case "BOOKMARK" -> "wishlist";
+                    default -> null;
+                };
+                if (metric != null) {
+                    redisTemplate.opsForZSet().incrementScore("stats:books:" + metric, bookId.toString(), 1.0);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to maintain Redis metrics for event: {}", eventType, e);
         }
     }
 

@@ -5,7 +5,7 @@ import org.springframework.data.cassandra.repository.config.EnableCassandraRepos
 
 @Configuration
 @EnableCassandraRepositories(
-        basePackages = "com.bookstore.repository"
+        basePackages = "com.bookstore.repository.cassandra"
 )
 public class CassandraConfig {
 }

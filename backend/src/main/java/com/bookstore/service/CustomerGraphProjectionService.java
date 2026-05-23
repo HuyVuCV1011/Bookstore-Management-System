@@ -15,7 +15,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +25,6 @@ public class CustomerGraphProjectionService {
     private final GraphInteractionService graphInteractionService;
 
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
     public void handleCustomerProjectionEvent(CustomerGraphProjectionEvent event) {
         try {
             if (shouldDeactivate(event)) {

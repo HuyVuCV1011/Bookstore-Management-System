@@ -1,99 +1,69 @@
-# Bookstore Frontend
+# Siren Reads Frontend
 
-React + TypeScript frontend for the Bookstore authentication system with Apple-inspired UI.
+React + TypeScript storefront and operations UI for the Siren Reads bookstore system.
 
 ## Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Run development server
 npm run dev
+```
 
-# Build for production
+Common scripts:
+
+```bash
 npm run build
-
-# Preview production build
+npm run lint
 npm run preview
 ```
 
-## Test Accounts (Mock Mode)
+## Environment
 
-Mock accounts are intended for local development only. Do not publish reusable passwords in documentation; configure local demo credentials outside committed source when mock mode is enabled.
-
-## Features
-
-- ✅ Beautiful glassmorphism UI
-- ✅ Form validation with Zod
-- ✅ Smooth animations with Framer Motion
-- ✅ Dark mode support
-- ✅ Responsive design
-- ✅ Mock authentication service
-
-## Tech Stack
-
-- React 18 + TypeScript
-- Vite
-- Tailwind CSS
-- Framer Motion
-- React Router v6
-- React Hook Form + Zod
-- Axios
-
-## Environment Variables
-
-Create a `.env` file:
+Create `frontend/.env` when running outside Docker:
 
 ```env
 VITE_API_URL=http://localhost:8080/api
 VITE_INACTIVITY_TIMEOUT=1800000
 ```
 
-## Mock Mode
+In Docker Compose, `VITE_API_URL` is passed as a build argument and points to the backend container through the host-exposed API port.
 
-Currently running with mock authentication. To connect to real backend:
+## Main User Areas
 
-1. Open `src/services/authService.ts`
-2. Set `MOCK_MODE = false`
-3. Ensure backend is running on port 8080
+- Storefront catalog, search, recommendations, book detail, cart, wishlist, checkout, profile, and order history.
+- Staff inventory, suppliers, purchase orders, receiving, reorder dashboard, and transaction history.
+- Admin catalog management, user management, review moderation, session monitoring, CDC status, and analytics.
+
+## Tech Stack
+
+- React 19
+- TypeScript 6
+- Vite 8
+- React Router 7
+- Axios
+- React Hook Form + Zod
+- Framer Motion
+- Recharts
+- Material UI
+- Tailwind CSS
 
 ## Project Structure
 
-```
+```text
 src/
-├── components/
-│   ├── auth/           # Authentication components
-│   ├── common/         # Reusable UI components
-│   └── layout/         # Layout components
-├── contexts/           # React Context providers
-├── pages/              # Page components
-├── services/           # API services
-├── types/              # TypeScript types
-├── utils/              # Utilities
-└── App.tsx             # Main app component
++-- components/      Shared, auth, cart, admin, analytics, staff, and domain widgets
++-- contexts/        Authentication and cart state providers
++-- hooks/           Reusable React hooks
++-- pages/           Route-level screens
++-- services/        API clients and backend integration helpers
++-- types/           TypeScript domain contracts
++-- utils/           Formatting, axios config, and helper functions
++-- App.tsx          Route shell
+`-- main.tsx         Vite entry point
 ```
 
-## UI Components
+## Integration Notes
 
-### Input
-Floating label input with validation and show/hide password toggle.
+The frontend treats the backend as the source of business rules. Stock validation, verified-purchase review checks, cart merge behavior, and database-specific workflows are enforced by backend services and surfaced through API responses.
 
-### Button
-Primary/secondary variants with loading state and hover animations.
-
-### Card
-Glassmorphism container with backdrop blur effect.
-
-### Toggle
-Apple-style switch for "Remember Me" functionality.
-
-## Design System
-
-Following Apple's design guidelines with custom Tailwind configuration:
-
-- **Primary Color**: `#007AFF` (Apple Blue)
-- **Font**: SF Pro Text (system fonts)
-- **Animations**: 300ms ease-out transitions
-- **Border Radius**: 8px (inputs/buttons), 16px (cards)
-- **Glassmorphism**: backdrop-blur + semi-transparent backgrounds
+Local demo accounts are for development only. Configure reusable credentials through private seed data or local environment files, not committed documentation.

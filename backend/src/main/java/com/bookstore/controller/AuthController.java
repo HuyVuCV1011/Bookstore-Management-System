@@ -6,11 +6,13 @@ import com.bookstore.dto.response.LoginResponse;
 import com.bookstore.dto.response.MessageResponse;
 import com.bookstore.dto.response.TokenResponse;
 import com.bookstore.dto.response.UserResponse;
+import com.bookstore.security.CurrentUser;
 import com.bookstore.service.AuthService;
 import com.bookstore.service.CartService;
 import com.bookstore.service.GuestCartService;
 import com.bookstore.service.JwtService;
 import com.bookstore.service.RateLimitService;
+import com.bookstore.service.RefreshTokenCookieService;
 import com.bookstore.util.CookieUtils;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +41,7 @@ public class AuthController {
     private final RateLimitService rateLimitService;
     private final CartService cartService;
     private final GuestCartService guestCartService;
+    private final RefreshTokenCookieService refreshTokenCookieService;
 
     @PostMapping("/register")
     public ResponseEntity<MessageResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -62,7 +65,7 @@ public class AuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse
     ) {
-        String ipAddress = getClientIP(httpRequest);
+        String ipAddress = rateLimitService.resolveClientIP(httpRequest);
         log.info("Login attempt for email: {} from IP: {}", request.getEmail(), ipAddress);
 
         rateLimitService.checkRateLimit(ipAddress);
@@ -72,13 +75,9 @@ public class AuthController {
             log.info("Login successful for email: {}, userId: {}", request.getEmail(), response.getUser().getId());
 
             // Set refresh token cookie
-            Cookie refreshCookie = new Cookie("refreshToken", response.getRefreshToken());
-            refreshCookie.setHttpOnly(true);
-            refreshCookie.setSecure(false); // Set to true in production with HTTPS
-            refreshCookie.setPath("/");
-            refreshCookie.setMaxAge(request.isRememberMe() ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60);
-            httpResponse.addCookie(refreshCookie);
-            log.debug("Refresh token cookie set with maxAge: {} seconds", refreshCookie.getMaxAge());
+            long maxAge = request.isRememberMe() ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60;
+            refreshTokenCookieService.setRefreshTokenCookie(httpResponse, response.getRefreshToken(), maxAge);
+            log.debug("Refresh token cookie set with maxAge: {} seconds", maxAge);
 
             // Auto-merge guest cart if exists
             Optional<String> guestSessionId = CookieUtils.getGuestSessionIdFromCookies(httpRequest);
@@ -117,7 +116,7 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<TokenResponse> refresh(
-            @CookieValue(value = "refreshToken", required = false) String refreshToken
+            @CookieValue(value = "${security.cookie.name:refreshToken}", required = false) String refreshToken
     ) {
         log.info("Token refresh attempt, token present: {}", refreshToken != null);
         try {
@@ -132,19 +131,14 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<MessageResponse> logout(
-            @CookieValue(value = "refreshToken", required = false) String refreshToken,
+            @CookieValue(value = "${security.cookie.name:refreshToken}", required = false) String refreshToken,
             HttpServletResponse httpResponse
     ) {
         log.info("Logout attempt, token present: {}", refreshToken != null);
         try {
             authService.logout(refreshToken);
 
-            Cookie refreshCookie = new Cookie("refreshToken", null);
-            refreshCookie.setHttpOnly(true);
-            refreshCookie.setSecure(false);
-            refreshCookie.setPath("/api/auth/refresh");
-            refreshCookie.setMaxAge(0);
-            httpResponse.addCookie(refreshCookie);
+            refreshTokenCookieService.deleteRefreshTokenCookie(httpResponse);
 
             log.info("Logout successful");
             return ResponseEntity.ok(MessageResponse.builder()
@@ -158,14 +152,13 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser(
-            @RequestHeader("Authorization") String authHeader
+            @CurrentUser UUID userId
     ) {
-        log.debug("Get current user attempt");
+        log.debug("Get current user attempt for userId: {}", userId);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         try {
-            String token = authHeader.substring(7); // Remove "Bearer " prefix
-            UUID userId = jwtService.extractUserId(token);
-            log.debug("Extracted userId: {}", userId);
-
             UserResponse userResponse = authService.getCurrentUser(userId);
             log.info("Get current user successful for userId: {}", userId);
             return ResponseEntity.ok(userResponse);
@@ -175,11 +168,4 @@ public class AuthController {
         }
     }
 
-    private String getClientIP(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader == null) {
-            return request.getRemoteAddr();
-        }
-        return xfHeader.split(",")[0];
-    }
 }

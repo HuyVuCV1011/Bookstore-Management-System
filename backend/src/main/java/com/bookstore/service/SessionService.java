@@ -2,7 +2,9 @@ package com.bookstore.service;
 
 import com.bookstore.entity.User;
 import com.bookstore.entity.SessionEntity;
-import com.bookstore.repository.SessionRepository;
+import com.bookstore.entity.UserSessionByBucket;
+import com.bookstore.entity.UserSessionByStatus;
+import com.bookstore.repository.cassandra.SessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.cassandra.core.CassandraTemplate;
 import org.springframework.data.cassandra.core.InsertOptions;
@@ -52,7 +54,29 @@ public class SessionService {
                         .ttl(ttlSeconds)
                         .build();
 
+        // 1. Save to user_sessions
         cassandraTemplate.insert(session, options);
+
+        // 2. Save to user_sessions_by_bucket
+        UserSessionByBucket bucketSession = UserSessionByBucket.builder()
+                .bucket("all")
+                .expiresAt(session.getExpiresAt())
+                .sessionId(session.getSessionId())
+                .userId(session.getUserId())
+                .refreshToken(session.getRefreshToken())
+                .revoked(session.getRevoked())
+                .deviceInfo(session.getDeviceInfo())
+                .ipAddress(session.getIpAddress())
+                .createdAt(session.getCreatedAt())
+                .build();
+        cassandraTemplate.insert(bucketSession, options);
+
+        // 3. Save to user_sessions_by_status
+        UserSessionByStatus activeStatus = UserSessionByStatus.builder()
+                .status("active")
+                .sessionId(session.getSessionId())
+                .build();
+        cassandraTemplate.insert(activeStatus, options);
 
         return session;
     }
@@ -76,6 +100,47 @@ public class SessionService {
         return session;
     }
 
+    public void revokeSession(SessionEntity session) {
+        session.setRevoked(true);
+        sessionRepository.save(session);
+
+        long remainingTtl = ChronoUnit.SECONDS.between(Instant.now(), session.getExpiresAt());
+        if (remainingTtl < 0) {
+            remainingTtl = 0;
+        }
+
+        InsertOptions options = InsertOptions.builder()
+                .ttl((int) remainingTtl)
+                .build();
+
+        // Update user_sessions_by_bucket
+        UserSessionByBucket bucketSession = UserSessionByBucket.builder()
+                .bucket("all")
+                .expiresAt(session.getExpiresAt())
+                .sessionId(session.getSessionId())
+                .userId(session.getUserId())
+                .refreshToken(session.getRefreshToken())
+                .revoked(true)
+                .deviceInfo(session.getDeviceInfo())
+                .ipAddress(session.getIpAddress())
+                .createdAt(session.getCreatedAt())
+                .build();
+        cassandraTemplate.insert(bucketSession, options);
+
+        // Move status from active to revoked
+        UserSessionByStatus activeStatus = UserSessionByStatus.builder()
+                .status("active")
+                .sessionId(session.getSessionId())
+                .build();
+        cassandraTemplate.delete(activeStatus);
+
+        UserSessionByStatus revokedStatus = UserSessionByStatus.builder()
+                .status("revoked")
+                .sessionId(session.getSessionId())
+                .build();
+        cassandraTemplate.insert(revokedStatus, options);
+    }
+
     public void revokeSession(String refreshToken) {
 
         SessionEntity session =
@@ -84,8 +149,6 @@ public class SessionService {
                         .orElseThrow(() ->
                                 new RuntimeException("Session not found"));
 
-        session.setRevoked(true);
-
-        sessionRepository.save(session);
+        revokeSession(session);
     }
 }

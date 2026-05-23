@@ -23,7 +23,7 @@ public class InventoryTransactionResponse {
     private TransactionType transactionType;
     private Integer quantityChange;
     private ReferenceType referenceType;
-    private Integer referenceId;
+    private String referenceId;
     private Integer oldQuantity;
     private Integer newQuantity;
     private UUID performedBy;

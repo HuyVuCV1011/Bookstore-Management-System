@@ -1,79 +1,75 @@
-# Architectural Overview - Polyglot Persistence Bookstore
+# Architecture Overview
 
-This document details the system architecture and data storage strategies implemented in the Bookstore Management System. The application utilizes a **Polyglot Persistence** architecture, matching individual business domains with the database engine best suited for their storage requirements, consistency models, and query patterns.
+Siren Reads uses a polyglot persistence architecture: one Spring Boot backend coordinates multiple databases, and each database is assigned to the workload it handles best. PostgreSQL owns critical transactions, while MongoDB, Redis, Cassandra, and Neo4j support specialized read models, cache/state, event logging, and relationship queries.
 
----
+For service-level rationale, see:
 
-## 1. System Topology & Data Store Assignments
+- [Backend logic guide](../backend/README.md)
+- [Service layer database decisions](../backend/src/main/java/com/bookstore/service/README.md)
+- [Neo4j graph module guide](../backend/src/main/java/com/bookstore/graph/README.md)
+- [Database schema guide](../db/README.md)
 
-The backend is built as a single Spring Boot application that manages active connections to five distinct database systems:
+## Topology
 
 ```mermaid
 graph TD
-    Client[React Frontend] -->|REST APIs| API[Spring Boot Service Layer]
-    API -->|RDBMS Operations| PostgreSQL[(PostgreSQL)]
-    API -->|Document Storage| MongoDB[(MongoDB)]
-    API -->|Caching & Session| Redis[(Redis)]
-    API -->|Event Streaming| Cassandra[(Cassandra)]
-    API -->|Recommendation Graph| Neo4j[(Neo4j)]
+    Client[React Frontend] -->|REST API| API[Spring Boot Backend]
+    API -->|Transactions and reports| PostgreSQL[(PostgreSQL)]
+    API -->|Documents and search read models| MongoDB[(MongoDB)]
+    API -->|TTL state and ranked lookups| Redis[(Redis)]
+    API -->|Interaction events| Cassandra[(Cassandra)]
+    API -->|Relationship traversal| Neo4j[(Neo4j)]
 
-    PostgreSQL -.->|ApplicationReadyEvent Sync| MongoDB
-    PostgreSQL -.->|On-Demand Graph Projection| Neo4j
+    PostgreSQL -.->|Book/customer/order facts| Neo4j
+    PostgreSQL -.->|Catalog projection| MongoDB
+    MongoDB -.->|Autocomplete rebuild| Redis
+    MongoDB -.->|Approved review signal| Neo4j
 ```
 
-### PostgreSQL (Source of Truth)
-- **Role**: Core Transactional Engine (RDBMS).
-- **Domain**: User authentication records, roles, book catalog metadata (author, publisher, price), inventory stock, purchase orders, invoices, and payment statuses.
-- **Why**: Demands strict ACID compliance, transactional integrity, and relational constraints.
+## Store Assignments
 
-### MongoDB (Document Database)
-- **Role**: Flexible Schema Document Store.
-- **Domain**: Persistent shopping carts (`carts` collection), user wishlists (`wishlists` collection), catalog text-search database (`book_search` collection), and user reviews (`reviews` collection).
-- **Why**: Handles high-write operations for active carts, stores complex nested objects like reviews, and supports flexible attributes without rigid schema migration overhead.
+| Store | Role | Primary Data |
+| :--- | :--- | :--- |
+| PostgreSQL | Transactional source of truth | Users, customers, staff, books, authors, publishers, categories, inventory, orders, order items, suppliers, purchase orders, sessions, and reporting views. |
+| MongoDB | Document read models | Authenticated carts, wishlists, reviews, book details, and catalog search documents. |
+| Redis | In-memory state and rankings | Guest carts, autocomplete entries, trending keywords/books, and rate-limit counters. |
+| Cassandra | Append-oriented events | User/book interaction events such as views, clicks, searches, purchases, and reviews. |
+| Neo4j | Graph projection | Book/customer/author/category/publisher nodes and purchase, view, rating, and co-purchase relationships. |
 
-### Redis (In-Memory Data Structure Store)
-- **Role**: High-Speed Cache & Session Store.
-- **Domain**: Anonymous guest carts (`guest_cart:<sessionId>` keys), API rate-limiting trackers, and active login session tokens.
-- **Why**: Sub-millisecond read/write latency. Guest carts utilize a 7-day Time-To-Live (TTL) expiration window that automatically renews on cart interactions.
+## Data Flow
 
-### Cassandra (Wide-Column Store)
-- **Role**: Distributed Column Family Store.
-- **Domain**: High-frequency clickstream event logs, real-time page views, and user navigation sessions.
-- **Why**: Designed for massive write scale. Linear write performance scale supports logging clickstream telemetry without degrading core transactional speeds.
+### Catalog Read Model
 
-### Neo4j (Graph Database)
-- **Role**: Native Graph Engine.
-- **Domain**: Recommendations engines, related-book graphs, and user interest networks.
-- **Why**: Performs deep relationship traversals (e.g. "Customers who purchased Book A also purchased Book B" or recommendation paths) exponentially faster than recursive SQL JOIN operations.
+PostgreSQL stores authoritative book data. On application startup, `BookSyncService` reads PostgreSQL books, writes MongoDB search documents, and then rebuilds Redis autocomplete entries from MongoDB.
 
----
+### Cart Flow
 
-## 2. Synchronization Mechanisms
+Authenticated carts are stored in MongoDB by `CartService`. Anonymous guest carts are stored in Redis by `GuestCartService` under `guest_cart:<sessionId>` with a seven-day TTL. Both paths validate book status and stock against PostgreSQL before saving quantities.
 
-To maintain consistency across disparate database systems without incurring the overhead of two-phase commits, the system uses asynchronous and event-driven data sync routes:
+### Checkout Flow
 
-### Postgres to MongoDB (Catalog Text Search)
-- **Mechanism**: `BookSyncService` listens to the Spring Boot `ApplicationReadyEvent`.
-- **Sync Routine**:
-  1. Triggers at application startup.
-  2. Queries all book entities from PostgreSQL.
-  3. Converts records into flat `BookSearch` document models.
-  4. Upserts records into MongoDB.
-- **Visibility constraint**: Search queries (text search, categories, price range filters) only return books where `businessStatus = ACTIVE`. Inactive and discontinued books are automatically hidden.
+`OrderService` creates PostgreSQL orders, checks customer profile completeness, verifies stock, deducts inventory, snapshots book fields into order items, and calculates totals inside a transaction. Order facts can later be projected into Neo4j for recommendations.
 
-### Postgres to Neo4j (Graph Recommendation Sync)
-- **Mechanism**: Projected updates.
-- **Sync Routine**:
-  - Automatically maps relational catalog nodes to the Graph network during administrative updates.
-  - Can be manually triggered on-demand via the administrative endpoint:
-    `POST /api/graph/sync/books`
-  - Creates Graph nodes for `Book`, `Author`, `Category`, and `User`, linking them with edges representing purchase and authorship relationships (`PURCHASED`, `WROTE`, `BELONGS_TO`).
+### Review Flow
 
----
+`ReviewService` stores review documents in MongoDB, but it first verifies purchase history from PostgreSQL. Reviews default to unmoderated. Once approved, the rating signal is projected into Neo4j so graph recommendations and rating relationships can use it.
 
-## 3. High-Security Business & Validation Logic
+### Interaction Event Flow
 
-- **Purchase-Only Reviews**: Users cannot review books unless they have an active customer account and have successfully ordered the target title. This is verified by checking PostgreSQL order tables using `OrderRepository.hasPurchasedBook(customerId, bookId)`.
-- **Single Review Constraint**: A user is limited to one review per book.
-- **Review Moderation**: Newly created or modified reviews are saved with `moderated = false`. They are excluded from average ratings and public views until approved by an administrator via `PUT /api/reviews/admin/approve/{reviewId}`.
-- **Transactional Cart Stock Validation**: Adding or merging items validates the *cumulative* quantity against the PostgreSQL `stockQuantity` (existing cart quantity + requested quantity).
+`InteractionEventService` writes interaction telemetry to Cassandra asynchronously. Event failures are logged but do not fail the main user request.
+
+### Recommendation Flow
+
+Neo4j receives projected books, customers, orders, views, and approved ratings. `GraphRecommendationService` then serves collaborative filtering, content-based recommendations, bought-together recommendations, graph book details, and graph review reads.
+
+## Consistency Strategy
+
+The system avoids distributed transactions across databases to ensure high availability and responsiveness. Instead:
+
+- PostgreSQL commits the authoritative business transaction.
+- MongoDB, Redis, Cassandra, and Neo4j receive specialized documents, keys, events, or graph projections.
+- We use the **Transactional Outbox Pattern** to reliably sync PostgreSQL changes to MongoDB and Neo4j projections, avoiding drift due to network or service failures.
+- Failed outbox events are retried automatically by a background scheduled worker, and administrators can monitor or manually replay them.
+- Critical user-facing validation always checks PostgreSQL where stock, orders, and account state are authoritative.
+
+For full architectural details on consistency strategy, database ownership, outbox flow, and retry/replay operations, see [Multi-Database Projections Guide](multi-db-projections.md).

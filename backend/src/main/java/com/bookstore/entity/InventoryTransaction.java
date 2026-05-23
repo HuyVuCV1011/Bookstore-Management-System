@@ -34,8 +34,8 @@ public class InventoryTransaction {
     @Column(name = "reference_type", length = 50)
     private ReferenceType referenceType;
 
-    @Column(name = "reference_id")
-    private Integer referenceId;
+    @Column(name = "reference_id", length = 100)
+    private String referenceId;
 
     @Column(name = "old_quantity", nullable = false)
     private Integer oldQuantity;

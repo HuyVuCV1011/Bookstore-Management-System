@@ -69,6 +69,13 @@ public class OrderController {
         return ResponseEntity.ok(orderService.updateOrderStatus(id, request));
     }
 
+    @PutMapping("/{id}/payment/confirm")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    public ResponseEntity<OrderResponse> confirmPayment(@PathVariable UUID id) {
+        log.info("PUT /api/orders/{}/payment/confirm", id);
+        return ResponseEntity.ok(orderService.confirmOrderPayment(id));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'ADMIN')")
     public ResponseEntity<Void> cancelOrder(@PathVariable UUID id) {

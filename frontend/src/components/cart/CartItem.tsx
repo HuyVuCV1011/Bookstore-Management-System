@@ -25,14 +25,14 @@ export const CartItem: React.FC<CartItemProps> = ({ item }) => {
             {item.title}
           </h3>
           {item.isbn && (
-            <p className="text-sm text-text-secondary mb-2">
+            <p className="text-sm text-text-secondary dark:text-text-primary-dark/60 mb-2">
               ISBN: {item.isbn}
             </p>
           )}
-          <p className="text-xl font-semibold text-primary mb-1">
+          <p className="text-xl font-semibold text-primary dark:text-[#d4e9e2] mb-1">
             {item.price.toLocaleString('vi-VN')} đ
           </p>
-          <p className="text-sm text-text-secondary">
+          <p className="text-sm text-text-secondary dark:text-text-primary-dark/60">
             Còn {item.stockQuantity} sản phẩm
           </p>
         </div>

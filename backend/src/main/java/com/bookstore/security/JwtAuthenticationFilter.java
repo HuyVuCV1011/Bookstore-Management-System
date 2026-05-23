@@ -1,7 +1,7 @@
 package com.bookstore.security;
 
 import com.bookstore.entity.SessionEntity;
-import com.bookstore.repository.SessionRepository;
+import com.bookstore.repository.cassandra.SessionRepository;
 import com.bookstore.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -9,7 +9,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -30,6 +32,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
     private final SessionRepository sessionRepository;
 
+    @Value("${security.session.fail-closed:true}")
+    private boolean failClosed;
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -46,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     UUID userId = jwtService.extractUserId(token);
                     UUID sessionId = jwtService.extractSessionId(token);
 
-                    // Check if session is revoked (if sessionId exists in token)
+                    boolean sessionCheckFailed = false;
                     if (sessionId != null) {
                         try {
                             Optional<SessionEntity> sessionOpt = sessionRepository.findById(sessionId);
@@ -66,14 +71,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     filterChain.doFilter(request, response);
                                     return;
                                 }
+                            } else {
+                                log.debug("Session {} not found in session store, rejecting request", sessionId);
+                                filterChain.doFilter(request, response);
+                                return;
                             }
                         } catch (Exception e) {
-                            log.warn("Failed to check session validity for sessionId: {}", sessionId, e);
-                            // Continue anyway - don't fail request if Cassandra is down
+                            log.warn("Failed to check session validity for sessionId: {} (Cassandra error)", sessionId, e);
+                            sessionCheckFailed = true;
                         }
                     }
 
                     UserDetails userDetails = userDetailsService.loadUserById(userId);
+
+                    if (sessionCheckFailed && failClosed) {
+                        if (isHighRiskRequest(request, userDetails)) {
+                            log.error("Denying access to high-risk resource {} because session revocation check failed (Cassandra down)", request.getRequestURI());
+                            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"Service Unavailable\",\"message\":\"Security check failed: session store is unavailable.\"}");
+                            return;
+                        }
+                        log.warn("Allowing low-risk request to {} to proceed despite session store failure", request.getRequestURI());
+                    }
 
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
@@ -91,5 +111,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isHighRiskRequest(HttpServletRequest request, UserDetails userDetails) {
+        String path = request.getRequestURI();
+        if (path.startsWith("/api/admin") || 
+            path.startsWith("/api/inventory") || 
+            path.startsWith("/api/suppliers") || 
+            path.startsWith("/api/purchase-orders") ||
+            path.startsWith("/api/analytics") ||
+            path.startsWith("/api/dashboard")) {
+            return true;
+        }
+
+        if (userDetails != null) {
+            return userDetails.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .anyMatch(role -> role.equals("ROLE_ADMIN") || role.equals("ROLE_STAFF"));
+        }
+        return false;
     }
 }

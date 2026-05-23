@@ -1,8 +1,10 @@
 package com.bookstore.event;
 
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
+@NoArgsConstructor(force = true, access = lombok.AccessLevel.PRIVATE)
 public class InventoryChangedEvent extends EntityChangedEvent {
 
     private final Integer bookId;

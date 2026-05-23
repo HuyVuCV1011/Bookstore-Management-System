@@ -18,7 +18,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +31,6 @@ public class BookGraphProjectionService {
     private final GraphInteractionService graphInteractionService;
 
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
     public void handleBookProjectionEvent(BookGraphProjectionEvent event) {
         try {
             if (event.action() == BookGraphProjectionAction.DEACTIVATE) {
@@ -49,7 +47,6 @@ public class BookGraphProjectionService {
     }
 
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
     public void handleBookMetadataProjectionEvent(BookGraphMetadataProjectionEvent event) {
         try {
             List<Book> relatedBooks = switch (event.type()) {
