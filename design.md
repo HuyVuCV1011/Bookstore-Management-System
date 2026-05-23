@@ -1,5 +1,8 @@
 # Design System Inspired by Starbucks
 
+> [!NOTE]
+> **Domain vs. Visual Design**: While this design system is inspired by Starbucks (including color palettes, typography, and button scales), the functional domain of the application remains strictly a **Bookstore Management System** (handling books, authors, categories, orders, inventory, and purchase orders). Do not introduce any coffee-shop, beverage, or menu-item domain logic or naming into the database, backend, or business logic.
+
 ## 1. Visual Theme & Atmosphere
 
 Starbucks' design system is a **warm, confident retail flagship** wearing the green of their storefront apron across every surface. The canvas alternates between a neutral-warm cream (`#f2f0eb`) and a ceramic off-white (`#edebe9`) — colors that reference actual store materials: the paper napkins, the café walls, the wood finishes — while the signature **Starbucks Green** (`#006241`) anchors the brand moment on hero bands, CTAs, and the Rewards experience. The greens come in four calibrated shades (Starbucks, Accent, House, Uplift) each mapped to a specific surface role, and gold (`#cba258`) appears only around Rewards-status ceremony — not as a general accent.
