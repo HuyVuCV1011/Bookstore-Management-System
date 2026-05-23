@@ -25,6 +25,7 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { CatalogStatistics } from './pages/admin/CatalogStatistics';
 import { PopularBooksAnalytics } from './pages/admin/PopularBooksAnalytics';
 import { CdcMonitoring } from './pages/admin/CdcMonitoring';
+import { SystemHealthPage } from './pages/admin/SystemHealthPage';
 import { ReviewManagement } from './pages/admin/ReviewManagement';
 import { SessionManagementPage } from './pages/admin/SessionManagementPage';
 import { InteractionEventsPage } from './pages/admin/InteractionEventsPage';
@@ -180,6 +181,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="ADMIN">
                   <CdcMonitoring />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/system-health"
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <SystemHealthPage />
                 </ProtectedRoute>
               }
             />

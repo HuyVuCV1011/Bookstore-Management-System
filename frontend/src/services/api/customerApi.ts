@@ -8,6 +8,11 @@ export const customerApi = {
       params: { page, size, keyword },
     }),
 
+  getOverview: (page = 0, size = 20, keyword = '') =>
+    axiosInstance.get<PageResponse<any>>('/admin/customers/overview', {
+      params: { page, size, keyword },
+    }),
+
   getById: (id: string) =>
     axiosInstance.get<Customer>(`/customers/${id}`),
 

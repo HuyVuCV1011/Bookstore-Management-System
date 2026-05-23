@@ -10,21 +10,20 @@ import { customerApi } from '../../services/api/customerApi';
 import type { Customer, CustomerRequest } from '../../types/customer';
 
 export const CustomerManagement: React.FC = () => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [keyword, setKeyword] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
 
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const res = await customerApi.getAll(page, 20, keyword);
+      const res = await customerApi.getOverview(page, 20, keyword);
       console.log('[CustomerManagement] API Response:', res.data);
-      console.log('[CustomerManagement] First customer:', res.data.content[0]);
       setCustomers(res.data.content);
       setTotalPages(res.data.totalPages);
     } catch (error) {
@@ -43,17 +42,17 @@ export const CustomerManagement: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleEdit = (customer: Customer) => {
+  const handleEdit = (customer: any) => {
     setSelectedCustomer(customer);
     setShowModal(true);
   };
 
-  const handleDelete = (customer: Customer) => {
+  const handleDelete = (customer: any) => {
     setSelectedCustomer(customer);
     setShowDeleteDialog(true);
   };
 
-  const handleToggleStatus = async (customer: Customer) => {
+  const handleToggleStatus = async (customer: any) => {
     try {
       await customerApi.toggleStatus(customer.id);
       fetchCustomers();
@@ -92,10 +91,14 @@ export const CustomerManagement: React.FC = () => {
     { key: 'fullName', label: 'Họ tên' },
     { key: 'email', label: 'Email' },
     { key: 'phoneNumber', label: 'Điện thoại' },
+    { key: 'activeSessionsCount', label: 'Phiên hoạt động' },
+    { key: 'totalEventsCount', label: 'Lượt tương tác' },
+    { key: 'cartItemsCount', label: 'Giỏ hàng' },
+    { key: 'wishlistItemsCount', label: 'Yêu thích' },
     {
       key: 'isActive',
       label: 'Trạng thái',
-      render: (customer: Customer) => (
+      render: (customer: any) => (
         <button
           onClick={() => handleToggleStatus(customer)}
           className={`px-3 py-1 rounded-full text-xs font-medium ${

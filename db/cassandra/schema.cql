@@ -73,3 +73,14 @@ CREATE TABLE IF NOT EXISTS user_sessions_by_status (
     session_id uuid,
     PRIMARY KEY ((status), session_id)
 );
+
+-- 7. interaction_events_by_user table
+CREATE TABLE IF NOT EXISTS interaction_events_by_user (
+    user_id uuid,
+    event_time timestamp,
+    id uuid,
+    book_id int,
+    event_type text,
+    metadata text,
+    PRIMARY KEY ((user_id), event_time, id)
+) WITH CLUSTERING ORDER BY (event_time DESC, id ASC);

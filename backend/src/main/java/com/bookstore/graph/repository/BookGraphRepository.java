@@ -9,4 +9,7 @@ import java.util.Optional;
 @Repository
 public interface BookGraphRepository extends Neo4jRepository<BookNode, String> {
     Optional<BookNode> findByIsbn(String isbn);
+
+    @org.springframework.data.neo4j.repository.query.Query("MATCH (b:Book) WHERE b.isbn IN $isbns RETURN b.isbn")
+    java.util.List<String> findExistingIsbns(java.util.List<String> isbns);
 }

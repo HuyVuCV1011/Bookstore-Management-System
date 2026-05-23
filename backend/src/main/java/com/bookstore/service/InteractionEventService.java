@@ -3,9 +3,11 @@ package com.bookstore.service;
 import com.bookstore.entity.InteractionEvent;
 import com.bookstore.entity.InteractionEventByType;
 import com.bookstore.entity.InteractionEventByBucket;
+import com.bookstore.entity.InteractionEventByUser;
 import com.bookstore.repository.cassandra.InteractionEventRepository;
 import com.bookstore.repository.cassandra.InteractionEventByTypeRepository;
 import com.bookstore.repository.cassandra.InteractionEventByBucketRepository;
+import com.bookstore.repository.cassandra.InteractionEventByUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -25,6 +27,7 @@ public class InteractionEventService {
     private final InteractionEventRepository interactionEventRepository;
     private final InteractionEventByTypeRepository interactionEventByTypeRepository;
     private final InteractionEventByBucketRepository interactionEventByBucketRepository;
+    private final InteractionEventByUserRepository interactionEventByUserRepository;
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -73,7 +76,20 @@ public class InteractionEventService {
                     .build();
             interactionEventByBucketRepository.save(bucketEvent);
 
-            // 4. Maintain Redis aggregates for high-speed admin stats
+            // 4. Save to query-oriented user table
+            if (userId != null) {
+                InteractionEventByUser userEvent = InteractionEventByUser.builder()
+                        .userId(userId)
+                        .eventTime(eventTime)
+                        .id(id)
+                        .bookId(bookId)
+                        .eventType(eventType)
+                        .metadata(meta)
+                        .build();
+                interactionEventByUserRepository.save(userEvent);
+            }
+
+            // 5. Maintain Redis aggregates for high-speed admin stats
             maintainRedisMetrics(userId, bookId, eventType);
 
             log.info("=== TRACKING EVENT SUCCESS === Tracked {} event - userId: {}, bookId: {}", eventType, userId, bookId);
