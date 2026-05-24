@@ -2,6 +2,7 @@ package com.bookstore.controller;
 
 import com.bookstore.dto.request.CreateOrderRequest;
 import com.bookstore.dto.request.UpdateOrderStatusRequest;
+import com.bookstore.dto.request.SimulatePaymentRequest;
 import com.bookstore.dto.response.OrderResponse;
 import com.bookstore.dto.response.OrderStatsResponse;
 import com.bookstore.entity.OrderStatus;
@@ -74,6 +75,15 @@ public class OrderController {
     public ResponseEntity<OrderResponse> confirmPayment(@PathVariable UUID id) {
         log.info("PUT /api/orders/{}/payment/confirm", id);
         return ResponseEntity.ok(orderService.confirmOrderPayment(id));
+    }
+
+    @PostMapping("/{id}/pay")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'ADMIN')")
+    public ResponseEntity<OrderResponse> processOrderPayment(
+            @PathVariable UUID id,
+            @Valid @RequestBody SimulatePaymentRequest request) {
+        log.info("POST /api/orders/{}/pay", id);
+        return ResponseEntity.ok(orderService.processOrderPayment(id, request));
     }
 
     @DeleteMapping("/{id}")

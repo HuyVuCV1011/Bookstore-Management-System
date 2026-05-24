@@ -34,6 +34,11 @@ const orderApi = {
       params: { page, size }
     });
     return response.data;
+  },
+
+  payOrder: async (id: string, request: { paymentMethod: string, accountNumber?: string, cvv?: string, otp?: string, simulateFailure?: boolean }): Promise<OrderDetail> => {
+    const response = await axiosInstance.post(`/orders/${id}/pay`, request);
+    return response.data;
   }
 };
 

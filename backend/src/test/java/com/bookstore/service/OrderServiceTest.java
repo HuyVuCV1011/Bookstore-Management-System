@@ -63,6 +63,9 @@ class OrderServiceTest {
     @Autowired
     private InventoryTransactionRepository inventoryTransactionRepository;
 
+    @Autowired
+    private PaymentTransactionRepository paymentTransactionRepository;
+
     private OrderService orderService;
     private User testUser;
     private Customer testCustomer;
@@ -75,7 +78,7 @@ class OrderServiceTest {
     void setUp() {
         var inventoryMapper = new com.bookstore.mapper.InventoryMapper(userRepository);
         var inventoryService = new InventoryService(bookRepository, inventoryTransactionRepository, inventoryMapper, userRepository);
-        orderService = new OrderService(orderRepository, customerRepository, bookRepository, userRepository, inventoryService);
+        orderService = new OrderService(orderRepository, customerRepository, bookRepository, userRepository, inventoryService, paymentTransactionRepository);
 
         String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
         LocalDateTime now = LocalDateTime.now();
@@ -525,5 +528,101 @@ class OrderServiceTest {
 
         // Second confirmation should fail
         assertThrows(IllegalStateException.class, () -> orderService.confirmOrderPayment(orderId));
+    }
+
+    @Test
+    void testProcessOrderPayment_Success_UpdatesStatusAndCreatesTransaction() {
+        CreateOrderRequest.OrderItemRequest itemRequest = CreateOrderRequest.OrderItemRequest.builder()
+                .bookId(testBook.getId())
+                .quantity(1)
+                .build();
+
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .items(Collections.singletonList(itemRequest))
+                .shippingAddress("123 Test St")
+                .phoneNumber("0987654321")
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .shippingFee(BigDecimal.valueOf(10.00))
+                .build();
+
+        var response = orderService.createOrder(request);
+        UUID orderId = response.getId();
+
+        com.bookstore.dto.request.SimulatePaymentRequest payReq = com.bookstore.dto.request.SimulatePaymentRequest.builder()
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .simulateFailure(false)
+                .build();
+
+        var payResponse = orderService.processOrderPayment(orderId, payReq);
+        assertThat(payResponse.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+
+        // Verify transaction is saved
+        var transactions = paymentTransactionRepository.findByOrderId(orderId);
+        assertThat(transactions).hasSize(1);
+        assertThat(transactions.get(0).getStatus()).isEqualTo(PaymentTransactionStatus.COMPLETED);
+    }
+
+    @Test
+    void testProcessOrderPayment_Failure_ThrowsExceptionAndSavesFailedTransaction() {
+        CreateOrderRequest.OrderItemRequest itemRequest = CreateOrderRequest.OrderItemRequest.builder()
+                .bookId(testBook.getId())
+                .quantity(1)
+                .build();
+
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .items(Collections.singletonList(itemRequest))
+                .shippingAddress("123 Test St")
+                .phoneNumber("0987654321")
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .shippingFee(BigDecimal.valueOf(10.00))
+                .build();
+
+        var response = orderService.createOrder(request);
+        UUID orderId = response.getId();
+
+        com.bookstore.dto.request.SimulatePaymentRequest payReq = com.bookstore.dto.request.SimulatePaymentRequest.builder()
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .simulateFailure(true)
+                .build();
+
+        assertThrows(com.bookstore.exception.PaymentFailedException.class, () -> orderService.processOrderPayment(orderId, payReq));
+
+        // Verify transaction is saved as FAILED
+        var transactions = paymentTransactionRepository.findByOrderId(orderId);
+        assertThat(transactions).hasSize(1);
+        assertThat(transactions.get(0).getStatus()).isEqualTo(PaymentTransactionStatus.FAILED);
+
+        // Verify order payment status is UNPAID (failed attempt)
+        CustomerOrder order = orderRepository.findById(orderId).orElseThrow();
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
+    }
+
+    @Test
+    void testProcessOrderPayment_AlreadyPaid_ThrowsException() {
+        CreateOrderRequest.OrderItemRequest itemRequest = CreateOrderRequest.OrderItemRequest.builder()
+                .bookId(testBook.getId())
+                .quantity(1)
+                .build();
+
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .items(Collections.singletonList(itemRequest))
+                .shippingAddress("123 Test St")
+                .phoneNumber("0987654321")
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .shippingFee(BigDecimal.valueOf(10.00))
+                .build();
+
+        var response = orderService.createOrder(request);
+        UUID orderId = response.getId();
+
+        com.bookstore.dto.request.SimulatePaymentRequest payReq = com.bookstore.dto.request.SimulatePaymentRequest.builder()
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .simulateFailure(false)
+                .build();
+
+        orderService.processOrderPayment(orderId, payReq);
+
+        // Try to pay again
+        assertThrows(com.bookstore.exception.BusinessRuleException.class, () -> orderService.processOrderPayment(orderId, payReq));
     }
 }

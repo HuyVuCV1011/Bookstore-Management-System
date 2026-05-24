@@ -12,6 +12,7 @@ import { RecommendationsPage } from './pages/RecommendationsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { CartPage } from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
+import PaymentSimulationPage from './pages/PaymentSimulationPage';
 import { WishlistPage } from './pages/WishlistPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { UserManagementPage } from './pages/UserManagementPage';
@@ -76,6 +77,7 @@ function App() {
             <Route path="/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+            <Route path="/checkout/pay/:id" element={<ProtectedRoute><PaymentSimulationPage /></ProtectedRoute>} />
 
             {/* Protected – STAFF + ADMIN only */}
             <Route

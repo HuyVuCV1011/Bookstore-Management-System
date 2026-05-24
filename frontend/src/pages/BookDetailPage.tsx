@@ -438,7 +438,7 @@ export const BookDetailPage: React.FC = () => {
                   </span>
                 </div>
 
-                <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight mb-3 font-serif">
+                <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight mb-3">
                   {catalogBook?.title || graphBook?.title || book.title}
                 </h1>
 
@@ -937,7 +937,7 @@ export const BookDetailPage: React.FC = () => {
             </div>
             
             <div className="space-y-4">
-              <h3 className="text-xl md:text-2xl font-bold font-serif text-white">Giới thiệu tác phẩm</h3>
+              <h3 className="text-xl md:text-2xl font-bold text-white">Giới thiệu tác phẩm</h3>
               <p className="text-gray-200 text-sm md:text-base leading-relaxed whitespace-pre-line">
                 {catalogBook?.description || book.description}
               </p>
@@ -980,7 +980,7 @@ export const BookDetailPage: React.FC = () => {
         {/* Technical & Print Details (Nutrition Table Style) */}
         {book && (
           <div id="book-technical-details" className="bg-white rounded-2xl p-6 md:p-8 border border-[#edebe9] shadow-sm my-4">
-            <h3 className="text-lg font-bold text-[#1E3932] font-serif mb-6 border-b border-gray-100 pb-3">
+            <h3 className="text-lg font-bold text-[#1E3932] mb-6 border-b border-gray-100 pb-3">
               Thông số chi tiết & Quy chuẩn Bản in 📖
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1037,7 +1037,7 @@ export const BookDetailPage: React.FC = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fadeIn">
             <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-[#edebe9]">
               <div className="bg-[#1E3932] p-5 text-white flex justify-between items-center">
-                <h3 className="font-bold text-lg font-serif">Tùy chọn đóng gói & Quà tặng 📚</h3>
+                <h3 className="font-bold text-lg">Tùy chọn đóng gói & Quà tặng 📚</h3>
                 <button
                   onClick={() => setShowCustomizeModal(false)}
                   className="text-white/80 hover:text-white text-2xl font-bold line-height-none focus:outline-none cursor-pointer"

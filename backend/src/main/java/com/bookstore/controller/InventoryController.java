@@ -91,4 +91,12 @@ public class InventoryController {
         Page<InventoryTransactionResponse> result = inventoryService.getTransactionsByBook(bookId, pageable);
         return ResponseEntity.ok(PageResponse.of(result));
     }
+
+    @GetMapping("/low-stock")
+    public ResponseEntity<java.util.List<StockLevelResponse>> getLowStock(
+            @RequestParam(defaultValue = "10") int threshold,
+            @RequestParam(defaultValue = "5") int limit
+    ) {
+        return ResponseEntity.ok(inventoryService.getLowStockBooks(threshold, limit));
+    }
 }

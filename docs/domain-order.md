@@ -53,6 +53,13 @@ stateDiagram-v2
     PAID --> REFUNDED : Cancellation Refund
 ```
 
+### Payment Simulation & Transactions
+For electronic payment methods (Credit Card, Bank Transfer, E-Wallet), the system integrates a simulated payment gateway:
+- **Interactive Portal:** Customers can trigger payment via the `/checkout/pay/:id` path.
+- **Transaction Logs:** Every payment attempt registers an audit trail in the `payment_transactions` table in PostgreSQL.
+- **Outcome States:** Successful payments log a `COMPLETED` transaction and update the order payment status to `PAID`. Failed payments log a `FAILED` transaction, set the order to `UNPAID` (to allow retry), and return a validation error code.
+- **Idempotency:** Already-paid orders reject subsequent payment requests.
+
 ---
 
 ## 3. Stock Mutation Ownership

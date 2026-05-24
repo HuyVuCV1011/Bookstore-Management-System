@@ -110,7 +110,7 @@ export const BooksPage: React.FC = () => {
         <div className="bg-[#f2f0eb] rounded-2xl p-8 md:p-12 mb-2 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-[#edebe9]">
           <div className="flex-1 space-y-4">
             <span className="text-xs uppercase font-extrabold tracking-widest text-[#00754A]">Siren Reads Bookstore flagship</span>
-            <h1 className="text-3xl md:text-5xl font-extrabold text-[#1E3932] font-serif leading-tight">
+            <h1 className="text-3xl md:text-5xl font-extrabold text-[#1E3932] leading-tight">
               Khám phá những trang sách tuyệt vời tại Siren Reads 📚
             </h1>
             <p className="text-gray-700 max-w-xl text-sm md:text-base leading-relaxed">
@@ -219,7 +219,7 @@ export const BooksPage: React.FC = () => {
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold tracking-widest uppercase bg-[#00754A] text-white">
               Siren Rewards Bookstore ✨
             </span>
-            <h3 className="text-xl md:text-2xl font-bold font-serif">
+            <h3 className="text-xl md:text-2xl font-bold">
               Tích lũy Ngôi Sao - Đổi ngàn Sách hay 🌟
             </h3>
             <p className="text-gray-300 text-sm max-w-2xl leading-relaxed">

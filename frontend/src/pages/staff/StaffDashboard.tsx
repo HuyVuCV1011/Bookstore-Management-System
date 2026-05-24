@@ -8,6 +8,7 @@ import type { Order } from '../../types/order';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import OrderStatusBadge from '../../components/orders/OrderStatusBadge';
 import POStatusBadge from '../../components/purchaseOrders/POStatusBadge';
+import { inventoryApi } from '../../services/api/inventoryApi';
 
 export const StaffDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +21,22 @@ export const StaffDashboard: React.FC = () => {
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [recentPurchases, setRecentPurchases] = useState<PurchaseOrder[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
+
+  // Low stock
+  const [lowStockBooks, setLowStockBooks] = useState<any[]>([]);
+  const [loadingLowStock, setLoadingLowStock] = useState(false);
+
+  const fetchLowStock = async () => {
+    try {
+      setLoadingLowStock(true);
+      const response = await inventoryApi.getLowStock(10, 6);
+      setLowStockBooks(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch low stock books', err);
+    } finally {
+      setLoadingLowStock(false);
+    }
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -37,6 +54,7 @@ export const StaffDashboard: React.FC = () => {
 
     fetchStats();
     fetchRecentActivity();
+    fetchLowStock();
   }, []);
 
   const fetchRecentActivity = async () => {
@@ -63,6 +81,8 @@ export const StaffDashboard: React.FC = () => {
       setLoading(true);
       const response = await dashboardApi.getStaffStats();
       setStats(response.data);
+      await fetchLowStock();
+      await fetchRecentActivity();
     } catch (err: any) {
       console.error('Failed to refresh dashboard stats', err);
       setError('Không thể tải dữ liệu thống kê. Vui lòng thử lại.');
@@ -158,6 +178,53 @@ export const StaffDashboard: React.FC = () => {
               <div className="font-medium text-gray-900">Quản lý nhà cung cấp</div>
             </Link>
           </div>
+        </div>
+
+        {/* Low Stock Alerts Widget */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-8 border border-red-100">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">⚠️</span>
+              <h2 className="text-xl font-bold text-gray-900">Cảnh báo tồn kho thấp</h2>
+            </div>
+            <span className="text-xs bg-red-100 text-red-800 font-semibold px-2.5 py-0.5 rounded">
+              Dưới 10 quyển
+            </span>
+          </div>
+
+          {loadingLowStock ? (
+            <div className="text-center text-gray-500 py-4">Đang tải...</div>
+          ) : lowStockBooks.length === 0 ? (
+            <div className="text-center text-green-600 font-medium py-4 bg-green-50 rounded-lg">
+              ✅ Tất cả sách đều đạt lượng tồn kho an toàn!
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {lowStockBooks.map((book) => {
+                const suggestedQty = 30 - book.stockQuantity;
+                return (
+                  <div key={book.bookId || book.id} className="flex items-center justify-between p-4 bg-red-50/50 hover:bg-red-50 border border-red-100 rounded-xl transition">
+                    <div className="flex items-center gap-3">
+                      {book.coverUrl && (
+                        <img src={book.coverUrl} alt={book.title} className="w-10 h-14 object-cover rounded shadow" />
+                      )}
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm line-clamp-1">{book.title}</h4>
+                        <p className="text-xs text-gray-500 font-mono">ISBN: {book.isbn}</p>
+                        <p className="text-xs mt-1 text-red-600 font-medium">Tồn kho: {book.stockQuantity} quyển</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/staff/purchase-orders/create?bookId=${book.bookId || book.id}&quantity=${suggestedQty}`)}
+                      className="px-3 py-1.5 bg-[#006241] hover:bg-[#004d33] text-white text-xs font-bold rounded-lg transition"
+                    >
+                      🛒 Nhập sách ({suggestedQty})
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Recent Activity with Tabs */}

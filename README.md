@@ -26,8 +26,8 @@ The top-level README is intentionally short. Database-specific reasoning and ser
 
 | Area | Highlights |
 | :--- | :--- |
-| Storefront | Catalog browsing, book details, search, reviews, wishlist, cart, checkout, and order history. |
-| Staff tools | Inventory, suppliers, purchase orders, receiving goods, stock adjustments, and transaction history. |
+| Storefront | Catalog browsing, book details, search, reviews, wishlist, cart, checkout, payment simulation, and order history. |
+| Staff tools | Inventory low-stock alerts, suppliers, purchase orders with quick reorder shortcuts, receiving goods, stock adjustments, and transaction history. |
 | Admin tools | Book, author, publisher, category, user, review, session, CDC, catalog, and analytics dashboards. |
 | Recommendations | Related books, collaborative recommendations, content-based suggestions, and graph analytics. |
 | Data platform | PostgreSQL, MongoDB, Redis, Cassandra, and Neo4j run together through Docker Compose. |

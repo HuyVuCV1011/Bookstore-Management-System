@@ -61,7 +61,7 @@ const OrderHistoryPage: React.FC = () => {
             </h1>
             <button
               onClick={() => navigate('/books')}
-              className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition"
+              className="btn-secondary h-10 px-4 text-sm"
             >
               ← Quay lại cửa hàng
             </button>
@@ -82,7 +82,7 @@ const OrderHistoryPage: React.FC = () => {
               </p>
               <button
                 onClick={() => navigate('/books')}
-                className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all hover:scale-105"
+                className="btn-primary inline-flex h-10 items-center justify-center px-6 text-sm"
               >
                 Bắt đầu mua sắm
               </button>
@@ -132,7 +132,7 @@ const OrderHistoryPage: React.FC = () => {
                       {/* View Details Button */}
                       <button
                         onClick={() => navigate(`/orders/${order.id}`)}
-                        className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all hover:scale-105 flex items-center gap-2"
+                        className="btn-primary inline-flex h-10 items-center justify-center px-6 text-sm gap-2"
                       >
                         Xem chi tiết
                         <span className="text-lg">→</span>

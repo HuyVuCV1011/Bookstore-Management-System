@@ -5,9 +5,12 @@ import com.bookstore.dto.request.UpdateOrderStatusRequest;
 import com.bookstore.dto.response.OrderItemResponse;
 import com.bookstore.dto.response.OrderResponse;
 import com.bookstore.entity.*;
+import com.bookstore.dto.request.SimulatePaymentRequest;
 import com.bookstore.exception.InsufficientStockException;
 import com.bookstore.exception.ProfileIncompleteException;
 import com.bookstore.exception.ResourceNotFoundException;
+import com.bookstore.exception.PaymentFailedException;
+import com.bookstore.exception.BusinessRuleException;
 import com.bookstore.repository.*;
 import com.bookstore.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +39,7 @@ public class OrderService {
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
     private final InventoryService inventoryService;
+    private final PaymentTransactionRepository paymentTransactionRepository;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
@@ -306,5 +310,63 @@ public class OrderService {
                 .unitPrice(item.getUnitPrice())
                 .lineTotal(item.getLineTotal())
                 .build();
+    }
+
+    @Transactional
+    public OrderResponse processOrderPayment(UUID orderId, SimulatePaymentRequest request) {
+        log.info("Processing simulated payment for orderId: {}, method: {}", orderId, request.getPaymentMethod());
+
+        CustomerOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        // Validate access
+        User currentUser = getCurrentUser();
+        if (currentUser.getRole() == Role.CUSTOMER &&
+            !order.getUser().getId().equals(currentUser.getId())) {
+            throw new ResourceNotFoundException("Order not found with id: " + orderId);
+        }
+
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BusinessRuleException("Order is already paid");
+        }
+
+        String txRef = "TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+        PaymentTransactionStatus txStatus;
+        PaymentStatus orderPaymentStatus;
+        String gatewayMsg;
+
+        if (request.isSimulateFailure()) {
+            txStatus = PaymentTransactionStatus.FAILED;
+            orderPaymentStatus = PaymentStatus.UNPAID;
+            gatewayMsg = "Simulated payment failure. Card declined.";
+        } else {
+            txStatus = PaymentTransactionStatus.COMPLETED;
+            orderPaymentStatus = PaymentStatus.PAID;
+            gatewayMsg = "Simulated payment successful. Reference: " + txRef;
+        }
+
+        PaymentTransaction transaction = PaymentTransaction.builder()
+                .order(order)
+                .transactionReference(txRef)
+                .amount(order.getTotalAmount())
+                .paymentMethod(request.getPaymentMethod().name())
+                .status(txStatus)
+                .gatewayResponse(gatewayMsg)
+                .build();
+
+        paymentTransactionRepository.save(transaction);
+
+        order.setPaymentStatus(orderPaymentStatus);
+        orderRepository.save(order);
+
+        if (request.isSimulateFailure()) {
+            throw new PaymentFailedException("Giao dịch thất bại: " + gatewayMsg);
+        }
+
+        log.info("Payment simulator success - orderId: {}, txnRef: {}", orderId, txRef);
+
+        Customer customer = customerRepository.findByUserId(order.getUser().getId()).orElse(null);
+        return mapToResponse(order, customer);
     }
 }

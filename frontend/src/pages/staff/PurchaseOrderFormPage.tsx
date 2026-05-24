@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { bookApi } from '../../services/api/bookApi';
 import { StaffLayout } from '../../components/staff/StaffLayout';
 import { purchaseOrderApi } from '../../services/api/purchaseOrderApi';
 import { supplierApi } from '../../services/api/supplierApi';
@@ -27,6 +28,7 @@ interface POItemForm {
 export const PurchaseOrderFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const isEditMode = !!id;
 
   const [loading, setLoading] = useState(isEditMode);
@@ -67,6 +69,36 @@ export const PurchaseOrderFormPage: React.FC = () => {
     };
     fetchSuppliers();
   }, []);
+
+  // Prefill book from query params if present
+  useEffect(() => {
+    if (isEditMode) return;
+
+    const checkQueryParams = async () => {
+      const bookId = searchParams.get('bookId');
+      if (bookId) {
+        try {
+          const idNum = parseInt(bookId);
+          if (!isNaN(idNum)) {
+            const response = await bookApi.getById(idNum);
+            const book = response.data;
+            const qty = parseInt(searchParams.get('quantity') || '20');
+            setItems([{
+              bookId: book.id,
+              bookTitle: book.title,
+              bookIsbn: book.isbn || 'N/A',
+              quantity: qty,
+              unitCost: book.price * 0.8,
+              notes: 'Thêm nhanh từ cảnh báo tồn kho thấp'
+            }]);
+          }
+        } catch (err) {
+          console.error('Failed to pre-fill book from query param', err);
+        }
+      }
+    };
+    checkQueryParams();
+  }, [searchParams, isEditMode]);
 
   // Load PO data if editing
   useEffect(() => {

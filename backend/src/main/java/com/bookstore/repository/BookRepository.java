@@ -67,4 +67,7 @@ public interface BookRepository extends JpaRepository<Book, Integer> {
 
     @Query("SELECT COALESCE(SUM(b.stockQuantity), 0) FROM Book b WHERE b.deletedAt IS NULL")
     Long sumStockQuantity();
+
+    @Query("SELECT b FROM Book b WHERE b.deletedAt IS NULL AND b.stockQuantity < :threshold ORDER BY b.stockQuantity ASC")
+    List<Book> findLowStockBooks(@Param("threshold") int threshold, Pageable pageable);
 }

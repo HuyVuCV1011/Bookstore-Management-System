@@ -7,7 +7,7 @@ import { Modal } from '../../components/admin/Modal';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { CustomerForm } from '../../components/admin/customer/CustomerForm';
 import { customerApi } from '../../services/api/customerApi';
-import type { Customer, CustomerRequest } from '../../types/customer';
+import type { CustomerRequest } from '../../types/customer';
 
 export const CustomerManagement: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);

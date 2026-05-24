@@ -81,6 +81,7 @@ const OrderDetailPage: React.FC = () => {
 
   const orderStatus = order.status || order.orderStatus;
   const canCancelOrder = orderStatus === 'PENDING' || orderStatus === 'CONFIRMED' || orderStatus === 'PROCESSING';
+  const canPayOrder = (order.paymentStatus === 'PENDING' || order.paymentStatus === 'UNPAID') && order.paymentMethod !== 'CASH' && orderStatus !== 'CANCELLED';
 
   return (
     <Layout>
@@ -224,27 +225,38 @@ const OrderDetailPage: React.FC = () => {
           </div>
 
           {/* Actions */}
-          {canCancelOrder && (
-            <div className="app-card app-card-pad">
+          {(canCancelOrder || canPayOrder) && (
+            <div className="app-card app-card-pad space-y-3">
               <h3 className="section-title mb-4">Hành động</h3>
-              <button
-                onClick={handleCancelOrder}
-                disabled={cancelling}
-                className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-button font-semibold text-[15px] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {cancelling ? (
-                  <>
-                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                    Đang hủy...
-                  </>
-                ) : (
-                  <>
-                    Hủy đơn hàng
-                  </>
-                )}
-              </button>
+              {canPayOrder && (
+                <button
+                  onClick={() => navigate(`/checkout/pay/${order.id}`)}
+                  className="w-full px-4 py-2.5 bg-[#006241] hover:bg-[#004d33] text-white rounded-button font-semibold text-[15px] transition flex items-center justify-center gap-2"
+                >
+                  💳 Thanh toán ngay
+                </button>
+              )}
+              {canCancelOrder && (
+                <button
+                  onClick={handleCancelOrder}
+                  disabled={cancelling}
+                  className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-button font-semibold text-[15px] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {cancelling ? (
+                    <>
+                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                      Đang hủy...
+                    </>
+                  ) : (
+                    <>
+                      Hủy đơn hàng
+                    </>
+                  )}
+                </button>
+              )}
               <p className="text-xs text-gray-500 mt-2 text-center">
-                Chỉ có thể hủy đơn hàng đang chờ xử lý hoặc đã xác nhận
+                {canPayOrder && 'Thanh toán trực tuyến bằng thẻ, chuyển khoản QR hoặc MoMo.'}
+                {canCancelOrder && !canPayOrder && 'Chỉ có thể hủy đơn hàng đang chờ xử lý hoặc đã xác nhận'}
               </p>
             </div>
           )}

@@ -122,6 +122,28 @@
     box-shadow: 0 10px 22px rgba(86, 63, 46, 0.22);
   }
 
+  .btn-secondary {
+    background: transparent;
+    color: var(--color-text-primary-light);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-button);
+    font-weight: 600;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-surface-muted);
+    border-color: var(--color-text-secondary);
+  }
+
+  .btn-secondary:active {
+    transform: scale(0.95);
+  }
+
   .main-nav-tab {
     display: inline-flex;
     height: 38px;

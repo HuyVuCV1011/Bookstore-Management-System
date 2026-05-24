@@ -31,4 +31,8 @@ export const inventoryApi = {
   getTransactionsByBook: (bookId: number, page: number, size: number) => {
     return axiosInstance.get(`/inventory/transactions/book/${bookId}`, { params: { page, size } });
   },
+
+  getLowStock: (threshold = 10, limit = 5) => {
+    return axiosInstance.get('/inventory/low-stock', { params: { threshold, limit } });
+  },
 };

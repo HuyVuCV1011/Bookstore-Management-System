@@ -208,4 +208,12 @@ public class InventoryService {
 
         throw new IllegalStateException("Invalid authentication principal");
     }
+
+    @Transactional(readOnly = true)
+    public java.util.List<StockLevelResponse> getLowStockBooks(int threshold, int limit) {
+        org.springframework.data.domain.PageRequest pageRequest = org.springframework.data.domain.PageRequest.of(0, limit);
+        return bookRepository.findLowStockBooks(threshold, pageRequest).stream()
+                .map(inventoryMapper::toStockLevelResponse)
+                .collect(java.util.stream.Collectors.toList());
+    }
 }

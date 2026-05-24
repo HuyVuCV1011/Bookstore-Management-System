@@ -36,7 +36,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               ${className}
             `}
             style={{
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
               fontSize: '16px',
               lineHeight: '24px',
               fontWeight: 400,

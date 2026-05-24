@@ -43,6 +43,10 @@ For the latest checked behavior and test evidence, see [Feature Verification Not
 ### Order History
 - **Personal Log**: Customers can view past invoices, tracking statuses, and payment states.
 
+### Payment Simulator
+- **Mock Payment Gateway**: Simulates payment methods (Credit Card, Bank Transfer QR, MoMo) with card validation, mock failures, and OTP challenge windows.
+- **Transaction Auditing**: Records all payments, amounts, references, and gateway logs in the PostgreSQL `payment_transactions` table.
+
 ---
 
 ## 4. Graph-Powered Recommendation System
@@ -67,6 +71,8 @@ For the latest checked behavior and test evidence, see [Feature Verification Not
 ### Inventory Control
 - **Add/Modify Books**: Create new titles, adjust pricing, and toggle business visibility.
 - **Stock replenishment**: Record incoming shipments and update warehousing counts.
+- **Low-Stock Warnings Widget**: Dynamically tracks and displays warehouse books falling below safety thresholds (stock < 10) on the staff overview.
+- **Direct Reorder Shortcut**: Prefills purchase orders directly from low-stock card warnings, pre-calculating the suggested restocking quantities.
 
 ### Order Management
 - **Order tracking**: Monitor order state transitions (Pending, Processing, Completed, Cancelled).
